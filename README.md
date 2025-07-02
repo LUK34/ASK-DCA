@@ -1,21 +1,29 @@
 ### Life without Docker:
-- (1) "It works on my machine" problems
+- **(1) "It works on my machine" problems**
 - Developers would build and test apps on their laptops. When they move the app to servers, it often breaks because of differences in OS, libraries, versions, configurations, etc.
 - Without Docker, teams would spend hours or days debugging these environment differences.
 
-- (2) Complex Software Installations
+- **(2) Complex Software Installations**
 - installing something like a database (e.g., PostgreSQL) required manually:
 - download right version of s/w
 - install dependencies
 - configure services properly
 
-- (3) Heavy Virtual Machines (VMs)
+- **(3) Heavy Virtual Machines (VMs)**
 - Before Docker, developers used Virtual Machines like VirtualBox, VMware, or Hyper-V to simulate servers.
 - VMs are large, slow to start, and resource-hungry (each VM has a full OS inside).
 
-- (4) Scaling Applications is Difficult
+- **(4) Scaling Applications is Difficult**
 - Manually configuring and copying app binaries.
 - Manually setting up load balancers.
+
+- https://training.mirantis.com/dca-certification-exam/
+
+### Docker ubuntu installation commands: (Currently not going with this. We will be going with AWS Linux)
+- https://docs.docker.com/engine/install/ubuntu/
+
+### Product page of Docker Desktop:
+- https://www.docker.com/products/docker-desktop
 
 
 ### Docker Architecture
@@ -89,6 +97,13 @@
 - **Contains:** Everything defined in the image + a writable layer.
 - **Analogy:** Like a dish cooked using the recipe.
 - **Lifecycle:** Create → Start → Run → Stop → Remove
+- Whenever a docker image runs -> docker container is created. Docker container is assigned a unique identifier called **UUID**.
+- **UUID** is used to identify the docker container among others.
+- UUID is difficult for humans to understand. So docker also allow us to supply container names.
+- By default, if we do not specify the continaer name, docker supplies randomly generated name from 2 words, joined by an underscore.
+
+
+
 
 ### Docker hub:
 - https://hub.docker.com/
@@ -157,13 +172,43 @@ docker -v
 - To delete stopped containers + unused images + build cache
 -**CMD:** docker system prune -a
 
+- The docker inspect command is used to view detailed information about Docker objects, such as containers, images, networks, or volumes.
+-**CMD:** docker inspect <object_type> <object_name_or_id>
+
+- The command netstat -ntlp is used to display active TCP connections and listening ports along with the process IDs (PIDs) and the program names that are using those ports.
+- -n	Show numerical addresses instead of resolving hostnames
+- -t	Display TCP connections only
+- -l	Show only listening ports
+- -p	Show the PID and name of the program using the port
+-**CMD:** netstat -ntlp
+
+- This CMD will basically give you the list of IDs associated with the Docker containers which are currently
+present within my workstation.
+-**CMD:** docker container ls -aq
+
+- The below command. We are frst passing the list of IDs associated with Docker container which are currently 
+present in the workstation. We are passing the ids to docker container stop command.
+-**CMD:** docker container stop $(docker container ls -aq)
+
+- **Important. Refer Neal Vohra`s Docker Certified Associate Course -> Video 18**
+- `docker container exec` command runs a new command in a running container.
+- The command started using docker exec only runs while the container's primary process(PID 1)
+- and it is not restarted if the container is restarted.(Its like inception.)
+- Remember every container is a linux machine.
+- You can run commands inside the container(containers are basically linux machine) while noyt being logically logged in to the container.
+-**CMD:** docker container exec
+
 
 ### Running java springboot app Real-world applications using docker images (By Ashok Sir)
 - public docker image name (java springboot app) : ashokit/spring-boot-rest-api
+- Under security rule edit inbound rule to include port 9091.
+- Refer `Output 1` screenshot.
 -**CMD:**
 docker pull ashokit/spring-boot-rest-api
 docker run ashokit/spring-boot-rest-api
 docker run -d ashokit/spring-boot-rest-api
+docker run -d -p 9091:9090 ashokit/spring-boot-rest-api
+http://3.89.33.118:9091/welcome/LUKE
 
 - **USE ME: **
 **Syntax :** docker run -d -p <host-port>:<container-port> ashokit/spring-boot-rest-api
@@ -182,6 +227,9 @@ http://3.89.33.118:9091/welcome/LUKE
 **Note:** host port and container port no need to be same.
 
 ### Running python-flask-app Real-world applications using docker images (By Ashok Sir)
+- Under security rule edit inbound rule to include port 5051.
+- Refer `Output 2` screenshot.
+**CMDS:**
 docker pull ashokit/python-flask-app
 docker run -d -p 5051:5000 ashokit/python-flask-app
 http://host-public-ip:host-port/
@@ -208,21 +256,21 @@ FROM node:19.5
 MAINTAINER Ashok <ashok.b@oracle.com>
 
 ### (3) RUN
-- RUN keyword is used to specify instructions (commands) to execute at the time of docker image creation.
-- Note: We can specify multiple RUN instructions in Dockerfile and all those will execute in sequential manner.
+- **RUN** keyword is **used to specify instructions (commands) to execute at the time of docker image creation.**
+- **Note:** We can specify multiple RUN instructions in Dockerfile and all those will execute in sequential manner.
 - **Example:** 
 RUN 'git clone <repo-url>'
 RUN 'mvn clean package'
 
 ### (4) CMD
-- CMD keyword is used to specify instructions (commands) which are required to execute at the time of docker container creation.
+- **CMD** keyword is **used to specify instructions (commands) which are required to execute at the time of docker container creation.**
 - **Note:** If we write multiple CMD instructions in dockerfile, docker will execute only last CMD instruction.
 - **Example:** 
 CMD 'java -jar app.jar'
 CMD 'python app.py'
 
 ### (5) COPY
-- COPY instruction is used to copy the files from source to destination.
+- **COPY** keyword is **used to copy the files from source to destination.**
 - **Note:** It is used to copy application code from host machine to container machine.
 Source : HOST Machine
 Destination : Container machine
@@ -232,67 +280,216 @@ COPY target/app.war /usr/bin/tomcat/webapps/
 COPY app.py  /usr/app/
 
 ### (6) ADD
-- ADD instruction is used to copy the files from source to destination.
+- **ADD** keyword is **used to copy the files from source to destination.**
 - **Example:**
 ADD <source> <destination>
 ADD <URL> <destination>
 
 ### (7) WORKDIR
-- WORKDIR instruction is used to set / change working directory in container machine.
+- **WORKDIR** keyword is **used to set / change working directory in container machine.**
 - **Example:** 
 COPY target/sbapp.jar /usr/app/
 WORKDIR /usr/app/
 CMD 'java -jar sbapp.jar'
 
 ### (8) EXPOSE
-- EXPOSE instruction is used to specify application is running on which PORT number.
+- **EXPOSE** keyword **is used to specify application is running on which PORT number.**
 - **Note:** By using EXPOSE keyword we can't change application port number. It is just to provide information the people who are reading our Dockerfile.
 - **Example:** 
 EXPOSE 8080
 
 ### (9) ENTRYPOINT
-- It is used to execute instruction when container is getting created.
+- **ENTRYPOINT** keyword is used to execute instruction when container is getting created.
 - **Note:** ENTRYPOINT is used as alternate for 'CMD' instructions.
 CMD "java -jar app.jar"
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
+### Famous Interview Question:  What is the difference between 'RUN' keyword and 'CMD' keyword ?
+- **RUN** keyword is **used to specify instructions (commands) to execute at the time of docker image creation.**
+- **CMD** keyword is **used to specify instructions (commands) which are required to execute at the time of docker container creation.**
+
+### What is the purpose of 'COPY' keyword and 'ADD' keyword?
+- **COPY** keyword is **used to copy the files from source to destination.**. 
+- It is used to copy application code from host machine to container machine.
+- **Source:** HOST Machine
+- **Destination:** Container machine
+
+- **ADD** instruction is **used to copy the files from source to destination.**
+
+- ** The main difference between COPY and ADD keyword is as follows: **
+- The COPY and ADD instructions in a Dockerfile are both used to transfer files from the host system into the Docker image, but they have key differences.
+- COPY is the simpler and more predictable command, designed solely to copy files and directories from the build context into the image. 
+- On the other hand, ADD includes all the functionality of COPY but also supports two additional features:
+- it can automatically extract compressed archive files (like .tar, .tar.gz) and can fetch files from remote URLs. 
+- Because of its broader functionality, ADD can sometimes introduce unintended behavior, such as unexpectedly unpacking archives. 
+- For this reason, it is generally recommended to use COPY unless the extra capabilities of ADD are specifically required.
+
 ### What is the diff between 'CMD' & 'ENTRYPOINT' ?
 - CMD instructions we can override while creating docker container. ENTRYPOINT instructions we can't override.
 
+### Sample Dockerfile:
+FROM ubuntu
+
+MAINTAINER Ashok <ashok.b@oracle.com>
+
+RUN echo 'hello from run instruction-1'
+RUN echo 'hello from run instruction-2'
+
+CMD echo 'hi from cmd-1'
+CMD echo 'hi from cmd-2'
 
 
+### LAB 1: To build image in dockerfile:
+- **Code for `Dockerfile` **
+FROM ubuntu
+
+MAINTAINER Luke Rajan Mathew
+
+RUN echo 'run instruction-1'
+RUN echo 'run instruction-2'
+
+CMD echo 'cmd instruction-1'
+CMD echo 'cmd instruction-2'
+
+- **CMD:**
+docker build -t lrm-img-1
+docker run lrm-img-1
+
+- The above command will run the docker image and will immediately exit.
+- Because we are not running the image in detached mode.
+
+### LAB 2: Dockerfile for non springboot
+- install git client
+- **CMD:**
+sudo yum install git -y
+
+- install maven s/w
+- **CMD:**
+sudo yum install maven -y
+
+- clone project git repo
+- **CMD:**
+git clone https://github.com/ashokitschool/maven-web-app.git
+
+- build maven project
+- **CMD:**
+cd maven-web-app
+mvn clean package
+
+- check project war file
+- **CMD:**
+ls -l target
+
+- build docker image
+- **CMD:**
+- docker build -t <img-name> .
+docker build -t app1 .
+docker images
+
+- Create Docker Container
+- **CMD:**
+docker run -d -p 8081:8080 app1
+docker ps
+
+- Enable host port number in security group inbound rules and access our application.
+- **CMD:**
+- http://public-ip:8080/maven-web-app/
+http://54.157.12.247:8081/maven-web-app/
 
 
+### LAB 3: Dockerizing Java Spring Boot Application
+- Every JAVA SpringBoot application will be packaged as "jar" file only.
+- **Note:** To package java application we will use 'Maven' as build tool.
+- To run spring boot application we need to execute jar file.
+- **Syntax:** java -jar <jar-file-name>
+- **Note:** When we run springboot application jar file then springboot will start tomcat server with 8080 port number (embedded tomcat server).
+- **Dockerfile to run SpringBoot App:**
+FROM openjdk:11
+MAINTAINER "Ashok Bollepalli <797979>"
+COPY target/spring-boot-docker-app.jar  /usr/app/
+WORKDIR /usr/app/
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "spring-boot-docker-app.jar"]
 
 
+- clone project git repo
+- **CMD:**
+git clone https://github.com/ashokitschool/spring-boot-docker-app.git
+
+- build maven project
+- **CMD:**
+cd spring-boot-docker-app
+mvn clean package
+
+- check project war file
+- **CMD:**
+ls -l target
+
+- **Note:** Dockerfile is already created by Ashok sir. You can check by typing the below command
+- **CMD:**
+ls -ltr
+
+- build docker image
+- **CMD:**
+- docker build -t <img-name> .
+docker build -t app2 .
+docker images
+
+- Create Docker Container
+- **CMD:**
+docker run -d -p 8083:8080 app2
+docker ps
+
+http://54.157.12.247:8083/
 
 
+### LAB 4: Dockerizing Python Application
+- Python is a general purpose language.
+- **Note:** It is also called as scripting language.
+- We don't need any build tool for python applications.
+- We can run python application code directley like below
+- **Syntax :** $ python app.py
+- If we need any libraries for python (Ex: Flask) application development then we will mention them in "requirements.txt" file
+- **Note:** We will use "python pip" s/w to download libraries configured in requirements.txt file.
+- **Dockefile for Python Flask App Dockerfile**
+FROM python:3.6
+MAINTAINER Ashok Bollepalli "ashokitschool@gmail.com"
+COPY . /app
+WORKDIR /app
+EXPOSE 5000
+RUN pip install -r requirements.txt
+ENTRYPOINT ["python", "app.py"]
+
+- Clone git repo Python Flask App
+- **CMD:**
+git clone https://github.com/ashokitschool/python-flask-docker-app.git
+
+- Go inside project directory
+- **CMD:**
+cd python-flask-docker-app
+
+- Create docker image
+- **CMD:**
+docker build -t pyapp_flask .
+docker images
+
+- Create container
+- **CMD:**
+docker run -d -p 5052:5000 pyapp_flask
+docker ps
+
+- Access application in browser
+- URL : http://public-ip:5052/
+http://54.157.12.247:5052/
 
 
+### To prune all stopped containers, unused images, unused networks, unused volumes because of consumption of disk space:
+- **CMD:**
+docker system prune -a --volumes
 
+### LAB 5: Dockerizing Angular Application
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### LAB 6: Dockerizing React Application
 
 
 
