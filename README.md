@@ -190,6 +190,12 @@ present within my workstation.
 present in the workstation. We are passing the ids to docker container stop command.
 -**CMD:** docker container stop $(docker container ls -aq)
 
+- This command will forcefully delete all Docker images.
+-**CMD:** docker rmi -f $(docker images -q)
+
+- This command will forcefully delete a specific docker image.
+-**CMD:** docker rmi -f <image_id_or_name>
+
 - **Important. Refer Neal Vohra`s Docker Certified Associate Course -> Video 18**
 - `docker container exec` command runs a new command in a running container.
 - The command started using docker exec only runs while the container's primary process(PID 1)
@@ -493,7 +499,64 @@ docker system prune -a --volumes
 
 
 
+### LAB 7: Exploring `docker container exec` by using nginx image
+- `docker container exec` command runs a new command in a running container.
+- **IMPORTANT**
+- **The command started using docker exec only runs while the container's primary process(PID 1)**
+- **and it is not restarted if the container is restarted.(Its like inception.)**
+- Remember every container is a linux machine.
+- **docker container run -d --name <name to the container> <image to use for the container>**
+- **docker container run:** This tells Docker to create and start a new container.
+- **-d:** This flag stands for detached mode. It means the container will run in the background (you won't see logs or interact with it in the terminal immediately).
+- **--name docker-exec:** This assigns a name (docker-exec) to the container, so you can refer to it easily in other commands (like docker stop docker-exec or docker exec -it docker-exec bash).
+- **nginx:** This specifies the image to use for the container. In this case, it uses the official nginx image from Docker Hub, which starts an NGINX web server.
 
+- **netstat -ntlp**
+- This command is used to display active network connections and listening ports on your Linux system, with specific filtering. Here's a breakdown of each option:
+- **-n:** Show numerical addresses instead of resolving hostnames or service names. (Faster and clearer output.)
+- **-t:** Show only TCP connections (not UDP).
+- **-l:** Show only listening ports (services waiting for incoming connections).
+- **-p:** Show the PID and name of the program using the socket.
+
+- **/etc/init.d/nginx status**
+- This command is used to manage the NGINX service on systems that use SysVinit (older Linux service management system).
+- Checks the current status of the NGINX service.
+- It tells you if NGINX is running or stopped.
+
+- **/etc/init.d/nginx stop**
+- This command is used to manage the NGINX service on systems that use SysVinit (older Linux service management system).
+- Stops the NGINX web server.
+- It shuts down the NGINX process gracefully (if it's running).
+- When you execute the above command in the set of below commands. Because you are accessing inside the container, once you execute the command -> 
+- this will stop the container and you will come out of the host. When you check all the exiting active running processes, there is nothing.
+
+- **NOTE:** If you try to run commands which are not available inside the container, you will get an error.
+- So in this case you need to make sure that the executable file is in the path and available inside the container.
+- The error will appear like : **\"bash\":executable file not found in $PATH"**
+
+- You can run commands inside the container(containers are basically linux machine) while not being logically logged in to the container.
+- docker container exec -it <container name>
+- docker system prune -a --volumes
+- docker run --name mynginx -d -p 8000:80 nginx
+
+- **CMDS:**
+docker container run -d --name docker-exec nginx
+docker ps
+docker container exec -it docker-exec bash
+/etc/init.d/nginx status
+cd /bin
+ls -ltr
+apt-get update -y
+apt-get install -y net-tools
+which netstat
+exit
+docker ps
+docker container exec -it docker-exec netstat -ntlp
+docker container exec -it docker-exec bash
+netstat -ntlp
+/etc/init.d/nginx stop
+docker ps
+docker system prune -a --volumes
 
 
 
