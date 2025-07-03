@@ -225,7 +225,7 @@ http://3.89.33.118:9091/welcome/LUKE
 docker run -d -p 9091:9090 ashokit/spring-boot-rest-api
 http://3.89.33.118:9091/welcome/LUKE
 
-### What is Port Mapping???
+### What is Port Mapping??? (AshokIT)
 -**NOTE:** By default, services running inside a Docker container are isolated and not accessible from outside.
 - Docker port mapping is the process of linking container port to host machine port.
 - It is used to  allow external access to applications running inside the container.
@@ -241,7 +241,7 @@ docker run -d -p 5051:5000 ashokit/python-flask-app
 http://host-public-ip:host-port/
 http://3.89.33.118:5051/
 
-### Dockerfile
+### Dockerfile (AshokIT)
 - Dockerfile contains set of instructions to build docker image.
 - Filename : Dockerfile
 - To write dockerfile we will use below keywords
@@ -333,7 +333,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 ### What is the diff between 'CMD' & 'ENTRYPOINT' ?
 - CMD instructions we can override while creating docker container. ENTRYPOINT instructions we can't override.
 
-### Sample Dockerfile:
+### Sample Dockerfile: (AshokIT)
 FROM ubuntu
 
 MAINTAINER Ashok <ashok.b@oracle.com>
@@ -345,7 +345,7 @@ CMD echo 'hi from cmd-1'
 CMD echo 'hi from cmd-2'
 
 
-### LAB 1: To build image in dockerfile:
+### LAB 1: To build image in dockerfile: (AshokIT)
 - **Code for `Dockerfile` **
 FROM ubuntu
 
@@ -364,7 +364,7 @@ docker run lrm-img-1
 - The above command will run the docker image and will immediately exit.
 - Because we are not running the image in detached mode.
 
-### LAB 2: Dockerfile for non springboot
+### LAB 2: Dockerfile for non springboot (AshokIT)
 - install git client
 - **CMD:**
 sudo yum install git -y
@@ -403,7 +403,7 @@ docker ps
 http://54.157.12.247:8081/maven-web-app/
 
 
-### LAB 3: Dockerizing Java Spring Boot Application
+### LAB 3: Dockerizing Java Spring Boot Application (AshokIT)
 - Every JAVA SpringBoot application will be packaged as "jar" file only.
 - **Note:** To package java application we will use 'Maven' as build tool.
 - To run spring boot application we need to execute jar file.
@@ -449,7 +449,7 @@ docker ps
 http://54.157.12.247:8083/
 
 
-### LAB 4: Dockerizing Python Application
+### LAB 4: Dockerizing Python Application (AshokIT)
 - Python is a general purpose language.
 - **Note:** It is also called as scripting language.
 - We don't need any build tool for python applications.
@@ -493,13 +493,13 @@ http://54.157.12.247:5052/
 - **CMD:**
 docker system prune -a --volumes
 
-### LAB 5: Dockerizing Angular Application
+### LAB 5: Dockerizing Angular Application (AshokIT)
 
-### LAB 6: Dockerizing React Application
+### LAB 6: Dockerizing React Application (AshokIT)
 
 
 
-### LAB 7: Exploring `docker container exec` by using nginx image
+### LAB 7: Exploring `docker container exec` by using nginx image (Zeal vora) (IMPORTANT)
 - `docker container exec` command runs a new command in a running container.
 - **IMPORTANT**
 - **The command started using docker exec only runs while the container's primary process(PID 1)**
@@ -557,6 +557,135 @@ netstat -ntlp
 /etc/init.d/nginx stop
 docker ps
 docker system prune -a --volumes
+
+
+### Importance of `it` flag: (Zeal vora) (IMPORTANT)
+- Every process that we create in Linux enviroment, has 3 open file descriptors they are stdin,stdout,stderr.
+
+- **1. stdin (Standard Input)**
+- **Purpose:** Receives input from the user or another program.
+- **Stream Number:** 0
+- **Example:** When you type something in the terminal, it's sent to stdin.
+- cat              # waits for input from stdin (keyboard)
+- hello world      # you type this
+
+- **2. stdout (Standard Output)**
+- **Purpose:** Displays normal output of a program.
+- **Stream Number:** 1
+- **Example:** When you run echo Hello, it prints to stdout.
+- echo "Hello" > output.txt  # sends stdout to a file
+
+- **3. stderr (Standard Error)**
+- **Purpose:** Displays error messages.
+- **Stream Number:** 2
+- **Example:** If a command fails, the error goes to stderr.
+
+- The purpose of the it flag (often written as -it) in Docker is to run a container interactively with a terminal session attached.
+- **Breakdown of -it:**
+- **-i (interactive):** Keeps STDIN (standard input) open even if not attached. This allows you to interact with the container.
+- **-t (tty):** Allocates a pseudo-TTY (a terminal). This makes the terminal behave more like a real one, which is needed for commands like bash or sh.
+
+- **CMD:**
+docker run -it ubuntu bash
+
+- Starts a new container from the ubuntu image.
+- Opens a terminal inside it.
+- Launches the bash shell so you can type commands inside the container.
+
+- **Use case:**
+- Use -it when you want to:
+- Interact with the container's shell
+- Debug an issue inside the container
+- Explore a container manually
+
+### Default container commands: (Zeal vora) (IMPORTANT)
+- Whenever we run a container, a default command executes which typically runs as PID 1.
+- This command can be deined while we are defining the container image.
+
+- The default container command refers to the command that a container executes when it starts if no other command is specified at runtime.
+- This is defined in the Docker image itself, typically through either:
+- the **CMD** instruction in the Dockerfile
+- the **ENTRYPOINT** instruction
+
+### Restart policy of the container
+- Docker provides restart policies to automatically control the behavior of containers when they exit or fail.
+- These policies ensure that containers are restarted under certain conditions, which is useful for maintaining availability.
+- Here are the main restart policies in Docker:
+
+- **1. no (default)**
+- **Description:** Do not automatically restart the container.
+- **Use case:** You want full manual control.
+- **Example:**
+docker run --restart=no my-image
+
+- **2. always**
+- **Description:** Always restart the container regardless of the exit status.
+- **Use case:** Long-running services that should always be available.
+- **Note:** Even restarts after Docker daemon restarts.
+- **Example:**
+docker run --restart=always my-image
+
+- **3. on-failure[:max-retries]**
+- **Description:** Restart only if the container exits with a non-zero exit code (i.e., it failed).
+- **Optional:** You can limit the number of retries with :max-retries.
+- **Use case:** When you want to retry only on errors, but avoid infinite restart loops.
+- **Example:**
+docker run --restart=on-failure my-image
+docker run --restart=on-failure:5 my-image  # Retry up to 5 times
+
+- **4. unless-stopped**
+- **Description:** Restart the container unless it is explicitly stopped.
+- **Use case:** Like always, but won't restart the container if you stopped it manually.
+- **Example:**
+docker run --restart=unless-stopped my-image
+
+### Disk usage metric for Docker component:
+- The `docker system df` command is used to show the amount of disk space used by:
+- **Docker images**
+- **Containers**
+- **Volumes**
+- **Build cache**
+- **CMD:**
+docker system df
+docker system df -Verify
+
+### automatically delete container on Exit:
+- To delete a Docker container automatically on exit, use the --rm flag when running the container:
+
+- **What It Does:**
+- Runs the container.
+- Removes it immediately after it stops (whether it exits normally or crashes).
+- Saves you from cleaning up stopped containers manually.
+
+- **Example:**
+docker run --rm ubuntu echo "Hello, Docker!"
+- This runs the Ubuntu container, prints the message, and deletes the container once it's done.
+
+- **Notes:**
+- You cannot use --rm with --restart policies.
+- Useful for short-lived or testing containers.
+
+
+-**CMD:**
+docker container run -dt --rm --name testcontainer busybox ping -c10 google.com
+docker ps
+docker logs testcontainer
+docker ps -a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
