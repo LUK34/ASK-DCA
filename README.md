@@ -847,13 +847,29 @@ docker system prune -a --volumes
 - This instruction Docker allows us to tell the platform on how to test that our application is healthy.
 - When docker starts a container, it monitors the process that the container runs. If the process ends, the container exists.
 - That's just a basic check and does not necessarily tell the detail about the application.
+- If the exit code of the command is zero, then you will typically see the status as healthy.
+- However, if you see the status code of something like one, then it would be marked as unhealthy.
+ 
+- **Dockerfile**
+FROM busybox
+HEALTHCHECK --interval=5s --timeout=2s --retries=3 CMD ping -c 1 54.144.122.13
 
+- **CMD:**
+mkdir mony
+chmod 777 mony
+cd mony
+docker container run -dt --name busybox busybox sh
+docker ps
+docker build -t monitoring_health .
 
+docker container run -dt --name monitor_cn monitoring_health sh
+docker ps
+echo $?
+ping -c1 <ip addrs>
+echo $?
+docker inspect monitor_cn
 
-
-
-
-
+ping -c1 54.144.122.13
 
 
 
