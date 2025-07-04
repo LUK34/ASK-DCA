@@ -248,6 +248,7 @@ http://3.89.33.118:5051/
 
 ### (1) FROM:
 - It is used to specify base image required to run our application.
+- `FROM` instruction specifies the Base Image from which you are building.
 - **Example:**
 FROM openjdk:17
 FROM python:3.3
@@ -303,6 +304,18 @@ CMD 'java -jar sbapp.jar'
 - **Note:** By using EXPOSE keyword we can't change application port number. It is just to provide information the people who are reading our Dockerfile.
 - **Example:** 
 EXPOSE 8080
+- **When you do not include the EXPOSE <port> instruction in the Dockerfile:**
+- Nothing breaks.
+- The container still runs normally. But Docker doesn't document or inform others (or Docker tools) which port your application uses.
+- ** What EXPOSE does not do:**
+- It does not actually publish the port to your host machine.
+- It’s only metadata: a way to tell others which port the container is expected to use.
+- **So which port will be used if EXPOSE is missing?**
+- No port is exposed by default.
+- When you run a container from such an image, you must manually map the container port to a host port using the -p flag.
+- **Example:**
+docker run -p 8080:80 my-image
+- Even if the Dockerfile didn’t have EXPOSE 80, this still works because you explicitly told Docker to map host port 8080 to container port 80.
 
 ### (9) ENTRYPOINT
 - **ENTRYPOINT** keyword is used to execute instruction when container is getting created.
@@ -364,7 +377,7 @@ docker run lrm-img-1
 - The above command will run the docker image and will immediately exit.
 - Because we are not running the image in detached mode.
 
-### LAB 2: Dockerfile for non springboot (AshokIT)
+### LAB 2: Dockerfile for non springboot using Dockerfile (AshokIT)
 - install git client
 - **CMD:**
 sudo yum install git -y
@@ -403,7 +416,7 @@ docker ps
 http://54.157.12.247:8081/maven-web-app/
 
 
-### LAB 3: Dockerizing Java Spring Boot Application (AshokIT)
+### LAB 3: Dockerizing Java Spring Boot Application using Dockerfile (AshokIT)
 - Every JAVA SpringBoot application will be packaged as "jar" file only.
 - **Note:** To package java application we will use 'Maven' as build tool.
 - To run spring boot application we need to execute jar file.
@@ -449,7 +462,7 @@ docker ps
 http://54.157.12.247:8083/
 
 
-### LAB 4: Dockerizing Python Application (AshokIT)
+### LAB 4: Dockerizing Python Application using Dockerfile (AshokIT)
 - Python is a general purpose language.
 - **Note:** It is also called as scripting language.
 - We don't need any build tool for python applications.
@@ -495,9 +508,117 @@ docker system prune -a --volumes
 
 ### LAB 5: Dockerizing Angular Application (AshokIT)
 
+- **Build Stage (Multi-stage Build with Node.js)**
+
+- **FROM node:18 AS build**
+- This starts a new build stage using the Node.js v18 image.
+- The alias build allows us to refer to this stage later in the final image.
+- Node.js is required here to install dependencies and build the Angular app.
+
+- **WORKDIR /app**
+- Sets the working directory inside the container to /app.
+- All subsequent commands will run relative to this directory.
+
+- **COPY package*.json ./**
+- Copies package.json and package-lock.json (if it exists) from your host to the container.
+- These files are essential for installing project dependencies.
+
+- **RUN npm install**
+- Installs the npm dependencies listed in package.json.
+
+- **COPY . .**
+- Copies the entire Angular project (source code and files) into the container's /app directory.
+
+- **RUN npm run build --prod**
+- Runs the Angular CLI build command in production mode, outputting the built app into /app/dist/angular_docker_app.
+
+- **Production Stage (Nginx)**
+- **FROM nginx:alpine**
+- This starts a second stage using a lightweight Alpine-based Nginx image.
+- Nginx is used to serve the static Angular files.
+
+- **EXPOSE 80**
+- Informs Docker that the container will listen on port 80 (standard HTTP port).
+
+- **COPY --from=build /app/dist/angular_docker_app /usr/share/nginx/html**
+- Copies the built Angular files from the build stage to Nginx's default web root directory.
+- These files are now ready to be served by Nginx.
+
+-**Dockerfile:**
+FROM node:18 AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build --prod
+FROM nginx:alpine
+COPY --from=build /app/dist/angular_docker_app /usr/share/nginx/html
+EXPOSE 80
+
+-**CMD:**
+git clone https://github.com/ashokitschool/angular_docker_app
+cd angular_docker_app
+docker build -t ngapp .
+docker run -d -p 80:80 ngapp
+docker system prune -a --volumes
+
+
+### Difference between COPY and ADD (Zeal Vohra):
+- COPY takes in a src and destination. It omly lets you copy in a local file or directory from your host.
+- ADD lets you do that too, but it also supports 2 other source:
+- 1. First, you can use a URL instead of a local file/directory.
+- 2. Secondly, you can extract a tar file from the source directly.
+
 ### LAB 6: Dockerizing React Application (AshokIT)
 
+- **Stage 1: Build the App**
+- FROM node:18.13.0 as build
+- Uses the official Node.js 18.13.0 image
+- This stage is named build for reference in the next stage.
 
+- **WORKDIR /app**
+- Sets the working directory inside the container to /app.
+
+- **COPY package*.json ./**
+- Copies package.json and package-lock.json (if it exists) to the container. These files contain dependencies.
+
+- **RUN npm install**
+- Installs all dependencies listed in package.json.
+
+- **COPY . .**
+- Copies the rest of the project files into the container's /app directory.
+
+- **RUN npm run build --prod**
+- Builds the project in production mode.
+- This will usually generate a build (React) or dist (Angular) folder containing optimized static files (HTML, CSS, JS).
+
+- **Stage 2: Serve with Nginx**
+- FROM nginx:latest
+- Uses the official Nginx image to serve the static files.
+
+- **COPY --from=build /app/build /usr/share/nginx/html**
+- Copies the production-ready build output from the previous stage (build stage) to Nginx’s default public directory.
+
+- **EXPOSE 80**
+- Opens port 80 so Nginx can serve traffic on that port.
+
+-**Dockerfile:**
+FROM node:18.13.0 as build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build --prod
+FROM nginx:latest
+COPY --from=build app/build /usr/share/nginx/html
+EXPOSE 80
+
+-**CMD:**
+git clone https://github.com/ashokitschool/ReactJS_Docker_App
+cd ReactJS_Docker_App
+docker build -t ngapp .
+docker run -d -p 81:80 ngapp
+docker system prune -a --volumes
 
 ### LAB 7: Exploring `docker container exec` by using nginx image (Zeal vora) (IMPORTANT)
 - `docker container exec` command runs a new command in a running container.
@@ -607,7 +728,7 @@ docker run -it ubuntu bash
 - the **CMD** instruction in the Dockerfile
 - the **ENTRYPOINT** instruction
 
-### Restart policy of the container
+### Restart policy of the container (Zeal vora)
 - Docker provides restart policies to automatically control the behavior of containers when they exit or fail.
 - These policies ensure that containers are restarted under certain conditions, which is useful for maintaining availability.
 - Here are the main restart policies in Docker:
@@ -639,7 +760,7 @@ docker run --restart=on-failure:5 my-image  # Retry up to 5 times
 - **Example:**
 docker run --restart=unless-stopped my-image
 
-### Disk usage metric for Docker component:
+### Disk usage metric for Docker component: (Zeal vora)
 - The `docker system df` command is used to show the amount of disk space used by:
 - **Docker images**
 - **Containers**
@@ -672,6 +793,60 @@ docker ps
 docker logs testcontainer
 docker ps -a
 
+### LAB 8: Dockerfile for nginx (Zeal Vohra):
+- **FROM ubuntu**
+- **Purpose:** This sets the base image for your Docker image.
+- It tells Docker to use the official Ubuntu Linux image from Docker Hub as the starting point.
+- **RUN apt-get update**
+- **Purpose:** Updates the package lists in the container.
+- This ensures you have the latest information about available packages before installing anything.
+- **RUN apt-get install -y nginx**
+- **Purpose:** Installs the nginx web server in the container.
+- **-y** automatically confirms the installation prompts.
+- **COPY index.nginx-debian.html /var/www/html**
+- **Purpose:** Copies your custom HTML file from your local context (the folder where you run docker build) into the web root directory of nginx inside the container.
+- **CMD nginx -g 'daemon off;'**
+- **Purpose:** Starts the nginx server when the container runs.
+- **'daemon off;'** tells nginx to run in the foreground instead of background (which is required for Docker containers to keep running).
+
+- **index.nginx-debian.html**
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+
+    <h1>Welcome to Base Nginx Container from Luke Rajan Mathew</h1>
+
+</body>
+</html>
+
+- **Dockerfile:**
+FROM ubuntu
+RUN apt-get update
+RUN apt-get install -y nginx
+COPY index.nginx-debian.html /var/www/html
+CMD nginx -g 'daemon off;'
+
+- **CMD**
+docker build .
+docker images
+docker container run -d -p 8001:80 --name lrm_custom_nginx <Specify image id from images>
+curl 13.222.180.142:8001
+docker system prune -a --volumes
+
+- **URL:**
+13.222.180.142:8001
+
+
+### HEALTHCHECK Instruction:
+- **HEALTHCHECK** 
+- This instruction Docker allows us to tell the platform on how to test that our application is healthy.
+- When docker starts a container, it monitors the process that the container runs. If the process ends, the container exists.
+- That's just a basic check and does not necessarily tell the detail about the application.
 
 
 
