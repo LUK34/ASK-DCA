@@ -1107,4 +1107,30 @@ docker images
 docker load < myapp.tar
 docker images
 
+### Docker cache:
+- Docker creates container images using layers
+- Each command that is found in a Dockerfile creates a new layer.
+- Docker uses a layer cache to optimize the process of building Docker images and make it faster.
+- If the cache can't be used for a particular layer, all subsequent layers won't be loaded from cache.
+
+-**Dockerfile**
+FROM python:3.7-slim-buster
+COPY . .
+RUN pip install --quiet -r requirements.txt
+ENTRYPOINT ["python", "server.py"]
+
+-**requirements.txt**
+
+certifi==2018.8.24
+chardet==3.0.4
+Click==7.0
+cycler==0.10.0
+decorator==4.3.0
+defusedxml==0.5.0
+
+-**CMDS:**
+docker build -t without-cache .
+docker build -t with-cache .
+
+
 
