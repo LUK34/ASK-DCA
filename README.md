@@ -320,6 +320,7 @@ docker run -p 8080:80 my-image
 ### (9) ENTRYPOINT
 - **ENTRYPOINT** keyword is used to execute instruction when container is getting created.
 - **Note:** ENTRYPOINT is used as alternate for 'CMD' instructions.
+- The bst use for `ENTRYPOINT` is to set the image's main command. ENTRYPOINT doesn't allow you overrid the command.
 CMD "java -jar app.jar"
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
@@ -842,17 +843,32 @@ docker system prune -a --volumes
 13.222.180.142:8001
 
 
-### HEALTHCHECK Instruction:
+### HEALTHCHECK Instruction (Zeal Vohra):
 - **HEALTHCHECK** 
 - This instruction Docker allows us to tell the platform on how to test that our application is healthy.
 - When docker starts a container, it monitors the process that the container runs. If the process ends, the container exists.
 - That's just a basic check and does not necessarily tell the detail about the application.
 - If the exit code of the command is zero, then you will typically see the status as healthy.
 - However, if you see the status code of something like one, then it would be marked as unhealthy.
- 
+- 0: Success. The container is healthy and ready for use.
+- 1: Failure. The container is not working correctly.
+- 2: Reserved. Do not use this exit code.
+
+-**Sample Use-Case**
+- Check every 5 minute or so that a web-server is able to serve the site's main page within 3 seconds.
+- **CMD:** HEALTHCHECK --interval=5m --timeout=3s \ CMD curl -f http://localhost || exit 1
+
+-**Overciew of CURL**
+- CURL is used with -f option to fail silently.
+- This is mostly done to better enable scripts etc to better deal with failed attempts.
+- curl -f http://dexter.kplabs.in/test214.txt
+- curl -f http://dexter.kplabs.in/test214.txt | exit 1
+
 - **Dockerfile**
 FROM busybox
 HEALTHCHECK --interval=5s --timeout=2s --retries=3 CMD ping -c 1 54.144.122.13
+
+- Refer `Output 13_HealthCheck`
 
 - **CMD:**
 mkdir mony
@@ -861,7 +877,6 @@ cd mony
 docker container run -dt --name busybox busybox sh
 docker ps
 docker build -t monitoring_health .
-
 docker container run -dt --name monitor_cn monitoring_health sh
 docker ps
 echo $?
@@ -872,13 +887,224 @@ docker inspect monitor_cn
 ping -c1 54.144.122.13
 
 
+### LAB 9: Dockerfile WORKDIR example (Zeal Vohra):
+-**Note:**
+- The WORKDIR instruction can be used multiple times in a Dockerfile.
+- **WORKDIR** keyword is **used to set / change working directory in container machine.**
+- **Example:** 
+COPY target/sbapp.jar /usr/app/
+WORKDIR /usr/app/
+CMD 'java -jar sbapp.jar'
+
+-**Sample Snippet:**
+WORKDIR /a
+WORKDIR b
+WORKDIR c
+RUN pwd
+-**Output:/a/b/c**
+
+-**Dockerfile: Example 1**
+FROM busybox
+RUN mkdir -p /example/demo
+WORKDIR /example/demo
+RUN touch file01.txt
+CMD ["/bin/sh"]
+
+-**Dockerfile: Example 2**
+FROM busybox
+RUN mkdir -p /example/demo/context1/context2
+WORKDIR /example/demo
+WORKDIR context1
+WORKDIR context2
+RUN touch file01.txt
+CMD ["/bin/sh"]
+
+- Refer `Output 14_WORKDIR`
+
+-**CMD: Example 1**
+docker build -t workdir-demo .
+docker run -dt --name workdir-demo workdir-demo sh
+docker exec -it workdir-demo sh
+
+-**CMD: Example 2**
+docker build -t workdir-demo2 .
+docker run -dt --name workdir-demo2 workdir-demo2 sh
+docker exec -it workdir-demo2 sh
+docker system prune -a --volumes
+
+### LAB 10: ENV Example (Zeal Vohra):
+- The ENV instruction set the enviroment variable <key> to the value <value>
+
+- **Settig Enviroment Variables from CLI**
+- You can use the -e,--env and --env-file flags to set simple enviroment variable in the
+- container you're running, or overwrite variable that are defined in the Dockerfile of the
+- image you 're running.
+
+- **Snippet Code:**
+docker run -env VAR1=value1 --env VAR2=value2 ubuntu env | grep VAR
+
+- **Dockefile:**
+FROM busybox
+ENV NGINX 1.2
+RUN touch web-$NGINX.txt
+CMD ["/bin/sh"]
+
+- Refer **Output 15_ENV**
+
+**CMDS:**
+docker build -t image-env .
+docker run -dt --name image_env_1 image-env sh
+docker ps
+docker exec -it image_env_1 sh
+ls -ltr
+
+### Tagging Docker Images (Zeal Vohra):
+- create a directory and place a `Dockerfile` in this directory.
+- `-t` is used to specify the tag of the docker image.
+- Inside the directory execute the below command.
+**CMD: First way -> On building the image you can create the tag for the image**
+docker build -t demo:v1 .
+
+**CMD: Second way -> Tagging an existing image that was not tagged before**
+docker build .
+docker images
+docker tag <Image id> demo:v2
+docker tag 324505958 demo:v2
+docker images
+
+**CMD: Third way -> Creating a second tag for an already existing tag**
+- This will create an alias for the primary image.
+docker tag <specify the image name that you want to tag>
+docker tag ubuntu:latest myubuntu:v2
+
+### LAB 11: Docker commit command (Zeal Vohra):
+- Whenever you make changes inside the container it can be useful to commit a container file
+changes or settings into a new image.
+- By default, the container being commited and its processes will be paused while the image is
+commited
+- **Syntax:**
+docker container commit CONTAINER-ID myimage01
+
+- **Dockefile:**
+FROM busybox
+ENV NGINX 1.2
+RUN touch web-$NGINX.txt
+CMD ["/bin/sh"]
+
+**Commit CMD:** docker container commit <container name> <new name that you want to appear in docker images list>
+
+** What happens after we commit??**
+- we will be commiting the container with a new name. 
+- After that we will run the commited container with a new name
+- **1. Source Container:** busybox_v1 is the name (or ID) of an existing container that you have customized or modified (e.g., created files, installed packages).
+- **2.Commit:** Docker takes a snapshot of that container's filesystem as it is right now.
+- **3.New Image:** A new image named busybox_modi_01 is created based on that snapshot.
+- **4.Usage:** You can now use this new image to launch new containers with all the changes you made in busybox_v1.
+
+- Refer **Output 16_Commit**
+
+- **CMD:**
+docker run -dt --name busybox_v1 busybox
+docker ps
+docker container exec -it busybox_v1 sh
+ls -ltr
+cd root
+ls -ltr
+vi change1.txt
+ls -ltr
+exit
+docker container commit busybox_v1 busybox_modi_01
+docker images
+docker run -dt --name busybox_custom_v1 busybox_modi_01
+docker ps
+docker container exec -it busybox_custom_v1 sh
+cd /root
+ls -ltr
+vi change1.txt
+exit
 
 
+### Layers of Docker Image (Zeal Vohra):
+- A Docker image built up from a series of layers.
+- Each layer represents an instruction in the image's Dockerfile.
+- The major difference between a container and an image is the top writeable layer.
+- All writes to the container that add new or modify existing data are stored in this writable layer.
+**Video 41. Refer Neal Vohras notes.**
 
+### Managing images with CLI (Zeal Vohra):
+- **CMD:** docker image --help
+- **Video 43:Neal Vohra -> Inspecting Docker images**
+- **E.g: docker image inspect nginx --format='{{.ContainerConfig.Hostname}}'**
 
+### Image Pruning Steps (Zeal Vohra):
+- docker image prune command allows us to clean up unused images.
+- By default, the above command will only clean up dangling images.
+- Dangling Images= Image without Tags and Image not referenced by any container.
+- **docker image prune** command will remove all dangling images.
+- **docker image prune -a** command will remove all images that is not reference by any container.
 
+### LAB 12: Flattening Docker image (Zeal Vohra):
+- In a generic scenario, the more layers an image has the more the size of the imahe.
+- Some of teh image size goes from 5 GB to 10 GB.
+- Flattening an image to single layer can help reduce the overall size of the image.
 
+- The below will show you how to modify an image to a single layer.
+- This is called Flattening the image.
+- First create a Dockerfile and build a docker image and then do the below step.
 
+- **Dockerfile:**
+FROM ubuntu
+RUN apt-get update
+RUN apt-get install -y nginx
+CMD nginx -g 'daemon off;'
 
+- **Export and Import the container:**
+docker build -t myubuntu .
+docker run -dt --name myubuntu myubuntu sh
+docker export myubuntu > myubuntudemo.tar
+ls -l myubuntudemo.tar
+cat myubuntudemo.tar | docker import - myubuntu:latest
+docker image history myubuntu
+docker system prune -a --volumes
+
+- Refer `Output 17`
+
+### Docker Registry (Zeal Vohra):
+- A registry a stateless, highly scalable server side application that stores and lets you distribute docker images.
+- Docker hub is the simplest example that all of use must have used.
+- There are various types of registry available, which includes:
+- **Docker Registry**, **Docker Trusted Registry**, **Private Repository (AWS ECR)**, **Dockerhub**
+
+- You need to follow a format to push an image to a specific registry:
+- **CMDS:**
+docker tag ubuntu:latest localhost:5000/myubuntu
+docker images
+docker push localhost:5000/myubuntu
+
+### LAB 13: Moving images across hosts (Zeal Vohra):
+- The docker save command will save one or more images to a tar archieve and then later import in pendrive and import in another persons laptop.
+- **CMDS:**
+docker save busybox > busybox.tar
+
+- The docker load command will load an image from a tar archieve.
+- **CMD:**
+docker load < busybox.tar
+
+-**Dockerfile**
+FROM busybox
+RUN touch custom.txt
+CMD ["/bin/sh"]
+
+- Refer `Output 18`
+
+- **CMDS:**
+docker build -t myapp .
+docker images
+docker save myapp > myapp.tar 
+docker images
+docker rmi myapp
+docker images
+docker load < myapp.tar
+docker images
 
 
