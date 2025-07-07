@@ -1107,7 +1107,7 @@ docker images
 docker load < myapp.tar
 docker images
 
-### LAB 14: Docker cache:
+### LAB 14: Docker cache (Zeal Vohra)
 - Docker creates container images using layers
 - Each command that is found in a Dockerfile creates a new layer.
 - Docker uses a layer cache to optimize the process of building Docker images and make it faster.
@@ -1127,6 +1127,8 @@ Click==7.0
 cycler==0.10.0
 decorator==4.3.0
 defusedxml==0.5.0
+
+- Refer `Output 19`
 
 -**CMDS:**
 docker build -t without-cache .
@@ -1301,7 +1303,7 @@ to handle tasks like deployment, scaling,networking and monitoring.
 - Load balancing and traffic routing
 - Monitor Container health
 
-### Docker Swarm:
+### LAB 15: Docker Swarm (Zeal Vohra)
 - Create 3 virtual machines (AWS Linux Machines)
 - DOCK-SWARM-ND-1
 - DOCK-SWARM-ND-2
@@ -1339,12 +1341,14 @@ sudo systemctl enable docker
 sudo usermod -aG docker $USER
 docker --version
 
+- Refer `Output 20`
+
 - **CMD:**
 vi docker-install.sh
 chmod +x docker-install.sh
 ./docker-install.sh
 
-### Initializing Docker Swarm (Neal Vohra)
+### Initializing Docker Swarm (Zeal Vohra)
 - **NOTE: Video 64**
 - **Watch Neal Vohra video only. Do not practically implement each step present in the video because here we are using AWS Linux machine.**
 
@@ -1388,7 +1392,7 @@ ul1zqxk8pwi48ftuch39ccddd     ip-172-31-26-88.ec2.internal    Ready     Active  
 docker swarm join --token SWMTKN-1-1yafj5xnvght5ihyoykpv3uf361rn9bizhfrurk9kvn2t627pg-1pxaf2mhkhb6fsyaisl74e6o9 172.31.24.212:2377
 
 
-### Services, Tasks and Containers: (Neal Vohra)
+### LAB 16: Services, Tasks and Containers: (Zeal Vohra)
 - A service is the definition of the tasks to execute on the manager or worker node.
 
 **CMD:**docker service create--name webserver -replicas 1 nginx
@@ -1409,8 +1413,83 @@ docker service rm nginx_webserver
 docker ps
 
 
-### Scaling service in Swarm
-- Containers running in a services are called "task"
+### LAB 17: Scaling service in Swarm
+- Once you have deployed a service to a swarm, you are ready to use the Docker CLI to scale the number of containers in the service.
+- Containers running in a services are called "task".
+
+- **SCALE UP:** Upscale from 1 to 5 tasks
+- Execute the below commands in DOCK-SWARM-ND-1
+- **CMDS:**
+docker service create --name nginx_webserver --replicas 1 nginx
+docker service ps nginx_webserver
+docker service scale nginx_webserver=5
+docker service ps nginx_webserver
+
+- After executing the above commands in DOCK-SWARM-ND-1, go to DOCK-SWARM-ND-2
+- **CMDS:**
+docker ps
+sudo systemctl stop docker
+
+- Go back to DOCK-SWARM-ND-1
+- **CMDS:**
+docker service ps nginx_webserver
+
+- **SCALE DOWN: ** Downscale from 5 tasks to 1 task
+- DOCK-SWARM-ND-1. Originally there are 5 containers. Here we are going to scale down from 5 to 1.
+- **CMDS:**
+docker service scale nginx_webserver=1
+docker service ps nginx_webserver
+docker ps
+
+- Make sure you remove the service
+- **CMDS:**
+docker service rm nginx_webserver
+
+### Scaling servic in swarm
+- There are 2 ways in which you can scale service in swarm:
+
+- **Scale service -> example 1:**
+docker service scale my_webserver=5
+
+- **Scale service -> example 2:**
+docker service update --replicas 5 my_webserver
+docker service ls
+
+- **CMDS:**
+docker service ls
+docker service create --name service01 --replicas nginx
+docker service create --name service02 --replicas nginx
+docker service ls
+docker ps
+
+- We apply 2 scaling:
+- **CMDS:**
+docker service scale service01=2
+docker service update --replicas 2 service02
+docker ps
+
+- Refer `Output 21`
+
+- ** ---- CORRECT COMMAND ---- **
+- **CMD: The below command you can specify n number of services.**
+docker service scale service01=3 service02=3
+
+- ** ---- WRONG COMMAND ---- **
+- **CMD: The below command you cannot specify n number of services.**
+- docker service update --replicas 4 service02 service01
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
