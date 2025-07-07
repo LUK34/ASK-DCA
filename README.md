@@ -1107,7 +1107,7 @@ docker images
 docker load < myapp.tar
 docker images
 
-### Docker cache:
+### LAB 14: Docker cache:
 - Docker creates container images using layers
 - Each command that is found in a Dockerfile creates a new layer.
 - Docker uses a layer cache to optimize the process of building Docker images and make it faster.
@@ -1131,6 +1131,307 @@ defusedxml==0.5.0
 -**CMDS:**
 docker build -t without-cache .
 docker build -t with-cache .
+
+### Docker network:
+- Docker takes care of the networking aspects so that container can communicate with other containers and also with the Docker Host
+- Docker networking subsystem is pluggable, using drivers.
+- There are several drivers available by default, and provides core networking functionality.
+- **bridge**
+- **host**
+- **overlay**
+- **macvlan**
+- **none**
+
+- **CMD:** 
+docker network ls
+docker network inspect host
+docker network inspect bridge
+
+### Bridge Network:
+- A bridge network uses a software bridge which allows container connected to the
+same bridge network to communicate, while providing isolation from container which are not connected to that 
+bridge network.
+- A bridge is the default network driver for Docker.
+- If we do not specify a driver, this is the type of network you are creating.
+- When you start Docker, a default bridge newtork (also called bridge) is created
+automatically, and newly-started containers connect to it unless otherwise specified.
+- We also can create User-defined bridge Network which are superior to the default bridge.
+**CMDS:**
+brctl show
+
+### User-Defined Bridge Network:
+- There are various difference between default and user-defined bridge. Some of these includes:
+- User-defined bridges provide better isolcation and interoperability between containerized applications.
+- User-defined bridges providee automatic DNS resolution between container.
+- Containers can be attached and detached from user-defined networls on the fly.
+- Each user-defined network creats a configurable bridge.
+- Linked containers on the default bridge network share environment
+- If you do not specify the driver in the network, by default docker will create this specific network by bridge driver.
+**CMDS:**
+docker network ls
+docker network create --driver bridge lrm_bridge
+docker networkd ls
+brctl show
+ifconfig
+docker container run -dt --name mybridge01 --network lrm_bridge ubuntu
+docker container run -dt --name mybridge02 --network lrm_bridge ubuntu
+brctl show
+docker network inspect lrm_bridge
+docker ps
+docker container exec -it mybridge01 bash
+apt-get update && apt-get install net-tools && apt-get install iputils-ping
+
+### Host Networks:
+- This **driver removes the network isolation** between the **docker host** and the **docker container** 
+to use the host's networking directly.
+- For instance, if you run a container which binds to port 80 and use host networking, the Container's
+application will be available on port 80 on th host's IP address.
+-**CMDS:**
+docker network ls
+docker container run -dt --name lrm_host --network host ubuntu
+docker ps
+docker container exec -it lrm_host bash
+apt-get update && apt-get install net-tools
+exit
+docker container run -dt --name bridgey ubuntu
+docker ps
+docker container exec -it bridgey bash
+apt-get update && apt-get install net-tools -y
+ifconfig
+netstat -ntlp
+apt-get install nginx
+/etc/init.d/nginx Start
+netstat -ntlp
+exit
+netstat -ntlp
+docker container exec -it lrm_host bash
+netstat -ntlp
+ifconfig
+apt-get install nginx -y
+/etc/init.d/nginx start
+netstat -ntlp
+exit
+netstat -ntlp
+
+### None Networks:
+- If you want to completly disable the networking stack on a container, you can use the none network.
+- This mode will not configure any IP for the container and doesn't have any access to the external network as
+well as for other containers.
+-**CMDS:**
+docker network ls
+docker container run -dt --name mynone --network none alpine
+docker ps
+docker container exec -it mynone ash
+ifconfig
+ping google.com
+
+### Publishing exposed ports of containers:
+- We were discussing about an approach to publishing container port to host
+-**CMD:**
+docker container run -dt --name webserver -p 80:80 nginx
+- This is also referred as publish list as it publishes only list of port specified.
+
+- There is also a second approach to publish all the exposed ports of the container.
+-**CMD:**
+docker container run -dt --name webserver -P nginx
+
+- This is also referred as a **publish all**. In this approach, all exposed ports are published to random ports to host.
+
+### Container Orchestration
+- During the inital times, users relied on manual container management or basic scripts (such as python and shell scripts)
+to handle tasks like deployment, scaling,networking and monitoring.
+
+- ** ---- Scenario: Server -> App Container + Nginx Container ---- **
+
+- ** ---- Challenge 1 - Manual Scaling ---- **
+- So let's say that you have a server one where there are two containers that are running now suddenly
+- as part of your promotion or maybe some kind of advertisement, you are receiving very high traffic on your website.
+- And the issue is that there is only one container running for app, one container running for nginx.
+- So in the situation where there is an unexpected high amount of traffic that is coming to your website,you want some form of scaling to happen.
+- Now you also have a second server that is available. However, this scaling will not really happen automatically.
+- So now what will happen is the user or the developer. He will have to manually create the container on the second server as well.
+- And then whatever traffic that comes to your website, it needs to be load balanced between the containers in the server one and server number two.
+- So all of this is a manual process and it takes a lot of time.
+
+- ** ---- Challenge 2 - Lack of Fault Tolerance ---- **
+- Let's say that you have some containers that are running in the server one. **Now if a container has failed, it can be due to a wide variety of reasons.**
+- **It can be a crash, it can be due to resource exhaustion, etc. the container generally would not automatically restart without manual intervention in most of the cases.**
+- Now at this stage we are just taking an example where app container has failed. However, what happens if the entire server one has failed?
+- How would you automate things in such cases? So when you have a manual based approach, if the server one fails what you might do in the server two again you will launch the app container.
+- You will launch the nginx container, redirect the traffic to the server two and so on. So all of this is a manual process and it makes things difficult for production level environments.
+
+- **To overcome Challenge 1 and Challenge 2. The solution is Container Orchestration.**
+
+- ** ---- CONTAINER ORCHESTRATION ---- **
+- **Container orchestration automates the deployment, management, scaling and networking of the containers**.
+- Let's say a user wants to launch certain containers in a fleet of servers. 
+
+- **Old Approach:** 
+- The user will not manually log in to each of the server, manually run the docker run command to create a container, and so on that is the older approach. 
+
+- **New Approach:** 
+- The user will communicate directly to the container orchestration tool. 
+- The container orchestration tool will in turn take care of the responsibility of launching the containers in the appropriate server, making sure that this containers are always running.
+- **If the containers are not running: ** Let's say if a server one has crashed, then container orchestration tool has that logic to migrate that container or relaunch the container in another server.
+- To ensure that containers are always running. So most of the common tasks related to deployment scaling, networking, everything. Container orchestration tool takes care of it.
+
+- **Solution to Challenge 1:**
+- Let's say that you have in total of three servers that are running as part of the fleet. As of now, the traffic is less.
+- So you have 25% of traffic, and the container orchestration tool has launched one container in server number one.
+
+- **Note:** 
+- Many of the mature container orchestration tool can automatically scale the containers up or down, based on the defined policies and the real time traffic.This is the important part to understand.
+- Let's say as of now the traffic is less. You only have one container, but at a later stage you have increased the amount of traffic.
+
+- Assume that there is 75% traffic approaching server 1. So this single container might not be able to handle all of the requests.
+- In this situation, container orchestration will go ahead and launch multiple set of containers in multiple servers. and also the traffic will be routed equally among all of the servers.
+- And this is a great benefit for organizations. Along with that, we were discussing about the challenge related to fault tolerance.
+- Now when container orchestration is introduced, it can automatically look into the health check of the containers that are running.
+
+- Let's say that the server 1 has crashed due to some reason. Then container orchestration will go ahead and it has the appropriate logic to create one more set of
+- containers in another server and redirect all of the traffic to server number two so that the website is always running.
+- So all of this important logic, you don't really have to create the manual scripts related to it. The container orchestration tool automatically takes care of it.
+- And this is of great benefit and it saves huge amount of time.
+
+- **Container Orchestration: ** 
+- It is the process of automating the networking and management of containers so you can deploy application at scale.
+- Provisioning and deployment
+- Configuration and scheduling
+- Resource allocation
+- Load balancing and traffic routing
+- Monitor Container health
+
+### Docker Swarm:
+- Create 3 virtual machines (AWS Linux Machines)
+- DOCK-SWARM-ND-1
+- DOCK-SWARM-ND-2
+- DOCK-SWARM-ND-3
+ 
+- **How to verify OS release:**
+- **CMD:** cat /etc/os-release
+- **NOTE:** 
+- Amazon Linux 2023 (AL2023). In AL2023, yum is no longer available.
+- It has been replaced by dnf, and Docker installation is different since CentOS repos like docker-ce.repo won’t work directly.
+- No need to add external Docker repos — AL2023 includes Docker in its official repo.
+- Use dnf instead of yum.
+- Run newgrp docker or log out and back in to activate Docker group access without sudo.
+
+-**The below shell script does the following:**
+- Update the system
+- Install Docker from Amazon Linux 2023 repositories
+- Start and enable Docker service
+- Add current user to docker group (optional - to avoid using sudo with docker)
+- Print Docker version to verify
+
+- **docker-install.sh  --> OLD**
+#!/bin/bash
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum -y install docker-ce
+systemctl start docker
+systemctl enable docker
+
+- **docker-install.sh  --> NEW* --> USE ME*
+#!/bin/bash
+sudo dnf update -y
+sudo dnf install -y docker
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker $USER
+docker --version
+
+- **CMD:**
+vi docker-install.sh
+chmod +x docker-install.sh
+./docker-install.sh
+
+### Initializing Docker Swarm (Neal Vohra)
+- **NOTE: Video 64**
+- **Watch Neal Vohra video only. Do not practically implement each step present in the video because here we are using AWS Linux machine.**
+
+- A node is an instance of the Docker engine participating in the swarm.
+- To deploy your application to a swarm, you submit service definition to a manager node.
+- The manager node dispatches units of work called tasks to worker nodes.
+
+- **NOTE:**
+- **In AWS Linux 2 or AWS Linux 2023, the traditional ifconfig command is deprecated and not installed by default.**
+- **Instead, you should use the ip command from the iproute2 package.**
+
+- curl http://<AWS Linux machine Public IP Addresse assigned by AWS on start>/latest/meta-data/public-ipv4
+curl http://52.55.168.144/latest/meta-data/public-ipv4
+
+- **CMDS:**
+ifconfig
+
+- ifconfig confirms: (Example)
+- **Interface name:** enX0
+- **Private IP:** 172.31.24.212
+- **Docker bridge IP:** 172.17.0.1
+
+- ** ---- 1. Manager Node Command: (DOCK-SWARM-ND-1) ---- **
+- sudo docker swarm init --advertise-addr <MANAGER-IP>
+**CMD:** sudo docker swarm init --advertise-addr 172.31.24.212
+
+- Once you've run the command with sudo, you’ll get a docker swarm join token.
+**CMD:** sudo docker node ls
+
+- Find the Security Group attached to the Manager Node. Add Inbound Rule.
+- Custom TCP	TCP	2377	Custom: 0.0.0.0/0 or your worker subnet
+
+- **EXAMPLE: This is the type of output you must get**
+ID                            HOSTNAME                        STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+7u57n27yj3xbvhuhft5giqab9     ip-172-31-24-23.ec2.internal    Ready     Active                          25.0.8
+jqqxmomx4cnj2vacvlt5qvn5b *   ip-172-31-24-212.ec2.internal   Ready     Active         Leader           25.0.8
+ul1zqxk8pwi48ftuch39ccddd     ip-172-31-26-88.ec2.internal    Ready     Active                          25.0.8
+
+- ** ---- 2. Worker Nodes Command: (DOCK-SWARM-ND-2) ---- **
+- **EXAMPLE:**
+docker swarm join --token SWMTKN-1-1yafj5xnvght5ihyoykpv3uf361rn9bizhfrurk9kvn2t627pg-1pxaf2mhkhb6fsyaisl74e6o9 172.31.24.212:2377
+
+
+### Services, Tasks and Containers: (Neal Vohra)
+- A service is the definition of the tasks to execute on the manager or worker node.
+
+**CMD:**docker service create--name webserver -replicas 1 nginx
+
+- When you run the above command. Docker swarm will create one nginx container in one of the nodes which are part of the swarm.
+- Now, once this container is created and due to some reason this container has stopped working, the swarm will automatically restart that container.
+- Whenever the orchestrator detected that the container stopped working, The orchestrator will create the container again in either of the nodes.
+
+**CMDS:**
+docker service create --name nginx_webserver --replicas 1 nginx
+docker service ls
+docker service ps nginx_webserver
+docker ps
+docker stop <container-id>
+docker service ps nginx_webserver
+docker service ls
+docker service rm nginx_webserver
+docker ps
+
+
+### Scaling service in Swarm
+- Containers running in a services are called "task"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
