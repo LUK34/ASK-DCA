@@ -1445,7 +1445,7 @@ docker ps
 - **CMDS:**
 docker service rm nginx_webserver
 
-### Scaling servic in swarm
+### LAB 18: Scaling service in swarm
 - There are 2 ways in which you can scale service in swarm:
 
 - **Scale service -> example 1:**
@@ -1477,6 +1477,109 @@ docker service scale service01=3 service02=3
 - ** ---- WRONG COMMAND ---- **
 - **CMD: The below command you cannot specify n number of services.**
 - docker service update --replicas 4 service02 service01
+
+### LAB 19: Replicated + Global service
+- There are 2 types of services deployments replicated and global.
+
+- **Replicated Service:**
+- For a replicated service, you specify the number of identical tasks you want to run.
+- For example, you decide to deploy an NGINX service with 2 replicas each serving the same content.
+
+-**CMDS:**
+docker service ls
+docker service create --name myreplica --replicas 1 nginx
+docker service ps myreplica
+
+- **Global Service:**
+- A global service is a service that runs one task on every node.
+- Each time you add a node to the swarm, the orchestrator creates a task and the scheduler assigns the task
+- to the new node.
+
+- Since the `--mode global`, docker will create this specific service of name `antivirus` and will launch the task in each and every node.
+- `docker service ps antivirus` we can see that this antivirus service is installed in all the nodes because of the `--mode global`
+
+- Refer `Output 22`
+
+-**CMDS:**
+docker service create --name antivirus --mode global -dt ubuntu
+docker service ps antivirus
+
+### LAB 20: Draining swarm node
+- You can migrate all the containers which are running to a active node which you know that it is going
+to run for a longer period of time and that can be achieved with the help of draining.
+- Setting a node to drain means:
+- No new tasks (containers) will be scheduled on this node.
+- All existing tasks on this node will be stopped and moved to other nodes in the swarm that are in active state.
+- This is useful when you're doing maintenance on a node or want to temporarily remove it from handling workloads.
+
+-**CMD:**
+docker node update --availability drain <specify node name>
+
+-**Example:**
+- **CMD:** docker node update --availability drain ip-172-31-26-88.ec2.internal
+- You’re telling Docker Swarm to evacuate all services from this node.
+- Docker Swarm will automatically reschedule those tasks on other nodes.
+
+- **CMD:** docker node update --availability active ip-172-31-26-88.ec2.internal
+- This brings the node back to active state, allowing it to receive and run tasks again.
+- When you later reactivate the node. Swarm will again consider it a valid target for task scheduling.
+
+- **CMD:** sudo docker node ls
+- **OUTPUT: **
+6mlkmk3ea984   my_webserver.5   nginx:latest   ip-172-31-24-212.ec2.internal   Running         Running 42 seconds ago
+[ec2-user@ip-172-31-24-212 ~]$ docker node ls
+ID                            HOSTNAME                        STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+7u57n27yj3xbvhuhft5giqab9     ip-172-31-24-23.ec2.internal    Ready     Active                          25.0.8
+jqqxmomx4cnj2vacvlt5qvn5b *   ip-172-31-24-212.ec2.internal   Ready     Active         Leader           25.0.8
+ul1zqxk8pwi48ftuch39ccddd     ip-172-31-26-88.ec2.internal    Ready     Active                          25.0.8
+
+- let's say we move it to ten. So even if you move it to ten, Docker orchestrator will not create the new task within a node which
+- is marked as drain, it will only move it to the nodes which are part of the availability active.
+- So if you quickly do a Docker node ls over here, you should see that the Swarm zero three, the availability here is drained.
+
+- Refer `Output 23`
+
+-**CMDS:**
+sudo docker node ls
+docker node ls
+docker service create --name my_webserver --replicas 5 nginx
+docker service ps my_webserver
+-- docker node update --availability drain ip-172-31-26-88.ec2.internal 
+-- docker node update --availability active ip-172-31-26-88.ec2.internal 
+
+### Inspecting swarm services and nodes
+- The docker inspect command is used to view detailed low-level information about Docker objects like:
+- It returns detailed JSON output describing the object's configuration and current state. This includes:
+
+- For containers: 
+- Environment variables, Mount points (volumes), Network settings (IP address, ports), Resource limits (CPU, memory)
+- Start time and status, Command that started the container, Bind mounts and volumes, Host configuration
+
+- For images:
+- Image ID, Tags, Layers, Size, Creation time, For networks:, Subnet, Gateway, Connected containers
+
+- For networks:
+- Subnet, Gateway, Connected containers
+
+- **CMDS:**
+- docker service inspect <name of the service>
+- docker service inspect <name of the service> --pretty
+- docker node inspect <node id -> this we get from docker node ls> 
+- docker node inspect <node id -> this we get from docker node ls> --pretty
+
+ ### Adding Network and publishing ports to Swarm Tasks
+ - This is like port mapping.
+- docker service rm <service name>
+
+- Refer `Output 24`
+
+- **CMDS:**
+docker service ls
+docker service create --name mi_webserver --replicas 2 --publish 8080:80 nginx
+docker service ls
+docker service ps mi_webserver 
+netstat -ntlp
+hostname -i
 
 
 
