@@ -1567,8 +1567,8 @@ docker service ps my_webserver
 - docker node inspect <node id -> this we get from docker node ls> 
 - docker node inspect <node id -> this we get from docker node ls> --pretty
 
- ### Adding Network and publishing ports to Swarm Tasks
- - This is like port mapping.
+### LAB 21: Adding Network and publishing ports to Swarm Tasks
+- This is like port mapping.
 - docker service rm <service name>
 
 - Refer `Output 24`
@@ -1581,9 +1581,232 @@ docker service ps mi_webserver
 netstat -ntlp
 hostname -i
 
+### LAB 22: Docker Compose:
+- **Compose** is a **tool for defining and running multi-container Docker applications.**
+- With compose, you use a YAML file to configure your application`s services.
+- We can start all the services with single command - docker compose up
+- We can stop all the services with single command - docker compose down
+
+- **Commands to install docker-compose**
+- install docker compose
+- **CMD:**
+sudo curl -L "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+- **Check docker compose is installed or not**
+- **CMD:**
+docker-compose --version
+
+- **CMDS:**
+mkdir DockerCompose
+cd DockerCompose
+vi docker-compose.yml
+
+-**docker-compose.yml**
+version: '3'
+services:
+  webserver:
+    image: nginx
+    ports:
+      - "80:80"
+
+  database:
+    image: redis
+
+-**CMDS:**
+docker-compose config
+docker-compose up -d
+docker ps
+docker-compose down
+netstat -ntlp
 
 
+- **CMDS:**
+mkdir wordpress
+cd wordpress
+vi docker-compose.yml
 
+-**docker-compose.yml**
+version: '3.3'
+ 
+services:
+   db:
+     image: mysql:5.7
+     volumes:
+       - db_data:/var/lib/mysql
+     restart: always
+     environment:
+       MYSQL_ROOT_PASSWORD: somewordpress
+       MYSQL_DATABASE: wordpress
+       MYSQL_USER: wordpress
+       MYSQL_PASSWORD: wordpress
+ 
+   wordpress:
+     depends_on:
+       - db
+     image: wordpress:latest
+     ports:
+       - "8000:80"
+     restart: always
+     environment:
+       WORDPRESS_DB_HOST: db:3306
+       WORDPRESS_DB_USER: wordpress
+       WORDPRESS_DB_PASSWORD: wordpress
+       WORDPRESS_DB_NAME: wordpress
+volumes:
+    db_data: {}
+
+- **Summary:**
+- This Docker Compose file sets up a WordPress site with a MySQL 5.7 database.
+- Services:
+
+- **1. db (MySQL Database)**
+- Uses image: mysql:5.7
+- Mounts a named volume db_data to persist data (/var/lib/mysql)
+- Always restarts on failure (restart: always)
+- Sets environment variables for:
+- MYSQL_ROOT_PASSWORD: somewordpress
+- MYSQL_DATABASE: wordpress
+- MYSQL_USER: wordpress
+- MYSQL_PASSWORD: wordpress
+
+- **2. wordpress (WordPress Application):**
+- Depends on the db service (ensures DB starts first)
+- Uses image: wordpress:latest
+- Maps port 8000 on host to port 80 on container (access WordPress via http://localhost:8000)
+- Always restarts on failure
+- Configured with environment variables to connect to the MySQL DB:
+- Host: db:3306
+- User: wordpress
+- Password: wordpress
+- Database: wordpress
+
+- **3.Volumes:**
+- db_data: A named volume for persisting MySQL data
+
+- Refer `Output 25`
+
+-**CMDS:**
+docker-compose config
+docker-compose up -d
+docker ps
+docker-compose down
+
+### Deploying Multi-Service Apps in swarm
+- A specific web-application might have multiple containers that are required as part of the build process.
+- Whenever we make use of **docker service**, **it is typically for a single container image.**
+- The **docker stack** **can be used to manage a multi - service application.**
+
+- A **stack** is a groupd of interrelated service that share dependencies, and can be orchestrated and scaled together.
+- A **stack** can compose YAML file like the one that we define during Docker Compose.
+- We can define everything within the YAML file that we might define while creaing a docker Service.
+
+- Compose does not use swarm mode to deploy services to multiple nodes in a swarm. All containers will be scheduled
+- on the current node. To deploy your application across the swarm, use `docker stack deploy`
+
+-**docker-compose.yml**
+version: '3'
+services:
+  webserver:
+    image: nginx
+    ports:
+      - "80:80"
+
+  database:
+    image: redis
+
+- docker stop <container-id>
+- docker stack deploy --compose-file docker-compose.yml <name of the stack>
+- docker stack ps <name of the stack>
+
+- Refer `Output 26`
+
+- **CMDS:**
+cd DockerCompose
+docker stack deploy --compose-file docker-compose.yml mydemo
+docker stack ps mydemo
+docker stack rm mydemo
+
+### Locking Swarm Cluster:
+- Swarm cluster contains lot of sensitive information, which includes:
+- TLS key used to encrypt communication among swarm node.
+- Keys used to encrypt and decrypt the Raft logs on disk.
+- If your swarn is compromised and if data is store in plain-text, an attack can get all the sensitive information
+- Docker lock allows us to have control over keys.
+- **Make sure that docker swarm is present. If present only, execute the below commands**
+- **sudo -i**: If you're often accessing root-only folders, using sudo -i to enter an interactive root shell can make it easier.
+
+- **CMDS:**
+sudo systemctl status docker
+docker node ls
+sudo -i
+cd /var/lib/docker/swarm/certificates
+sudo ls -ltr
+cat swarm-node.key
+docker swarm update --help
+docker swarm update --autolock=true
+
+- e.g: SWMKEY-1-f5YWR0+ZZqx159+D0ESwP25RcgDY6vvpZkddAxoRWTs
+-**NOTE: `cat swarm-node.key` **
+- if the attacker gets hold of this key as well as the certificate, he will be able to decrypt the
+- communication as well as various raft encrypted log files.
+- So in order for you to avoid such situation, the Docker suggests you to go for the lock feature of swarm cluster.
+
+-**NOTE: `docker swarm update --autolock=true`**
+- Once you execute this command `docker swarm update --autolock=true`. You will get a key.
+- This key should be kept inside a password manager and will not be able to restart the MANAGER
+
+- **CMDS:**
+systemctl restart docker
+systemctl status docker
+docker node ls
+
+- **NOTE: Aftre executing `docker swarm update --autolock=true` and saving the key in a text file
+- If you execute `docker node ls`. It will say swarm is encrypted to be unlocked before it can be used.
+- Please use `docker swarm unlock` to unlock it.
+
+-**CMDS:**
+docker swarm unlock
+
+- Need to specify the key here.
+
+- If you want to retrieve the key back again
+-**CMDS:**
+docker node ls
+docker swarm unlock-key
+
+- If you want to rotate the key execute the below command:
+- **CMDS:**
+docker swarm unlock-key --rotate
+
+- e.g: SWMKEY-1-2gpmiMBkH7A2+RCQIqi4qQfIcQBGiSI/g/tnAD9LSMo
+
+- Refer `Output 27`
+
+### Troubleshooting Swarm Services Deployment:
+- A service may be configured in such a way that no node currently in the swarm can run its tasks.
+- In this case, the service remains in state **pending.**
+- There are multiple reason why service might go into pending state.
+
+- **Reason 1:** If all nodes are drained, and you create a service, it is pending until a node becomes available.
+- **Reason 2:** You can reserve a specific amount of memory for a service. If no node in the swarm has the required amount of memory,
+- the service remain in a pending state until a node is available which can run its tasks.
+- **Reason 3:** You have imposed some kind of placement constraints.
+
+-docker ls
+-docker inspect <id value of service>
+-docker service rm mi_webserver
+-**CMDS:**
+docker service ls
+docker service ps mi_webserver
+
+### Mounting volumes in CONTAINER
+- docker container exec -it <container id> bash
+-**CMDS:**
+docker service create --name my_service --mount type=volume,source=myvolume,target=/mypath nginx
+docker service ps my_service
+docker volume ls
+docker service rm my_service
 
 
 
