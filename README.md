@@ -1686,7 +1686,7 @@ volumes:
 
 - Refer `Output 25`
 
--**CMDS:**
+- **CMDS:**
 docker-compose config
 docker-compose up -d
 docker ps
@@ -1704,7 +1704,7 @@ docker-compose down
 - Compose does not use swarm mode to deploy services to multiple nodes in a swarm. All containers will be scheduled
 - on the current node. To deploy your application across the swarm, use `docker stack deploy`
 
--**docker-compose.yml**
+- **docker-compose.yml**
 version: '3'
 services:
   webserver:
@@ -1747,12 +1747,12 @@ docker swarm update --help
 docker swarm update --autolock=true
 
 - e.g: SWMKEY-1-f5YWR0+ZZqx159+D0ESwP25RcgDY6vvpZkddAxoRWTs
--**NOTE: `cat swarm-node.key` **
+- **NOTE: `cat swarm-node.key` **
 - if the attacker gets hold of this key as well as the certificate, he will be able to decrypt the
 - communication as well as various raft encrypted log files.
 - So in order for you to avoid such situation, the Docker suggests you to go for the lock feature of swarm cluster.
 
--**NOTE: `docker swarm update --autolock=true`**
+- **NOTE: `docker swarm update --autolock=true`**
 - Once you execute this command `docker swarm update --autolock=true`. You will get a key.
 - This key should be kept inside a password manager and will not be able to restart the MANAGER
 
@@ -1765,13 +1765,13 @@ docker node ls
 - If you execute `docker node ls`. It will say swarm is encrypted to be unlocked before it can be used.
 - Please use `docker swarm unlock` to unlock it.
 
--**CMDS:**
+- **CMDS:**
 docker swarm unlock
 
 - Need to specify the key here.
 
 - If you want to retrieve the key back again
--**CMDS:**
+- **CMDS:**
 docker node ls
 docker swarm unlock-key
 
@@ -1796,7 +1796,7 @@ docker swarm unlock-key --rotate
 -docker ls
 -docker inspect <id value of service>
 -docker service rm mi_webserver
--**CMDS:**
+- **CMDS:**
 docker service ls
 docker service ps mi_webserver
 
@@ -1810,12 +1810,12 @@ docker service ps mi_webserver
 
 - **sudo -i**: If you're often accessing root-only folders, using sudo -i to enter an interactive root shell can make it easier.
 
--**CMDS: for DOCK-ND-1**
+- **CMDS: for DOCK-ND-1**
 docker service create --name my_service --mount type=volume,source=myvolume,target=/mypath nginx
 docker service ps my_service
 docker volume ls
 
--**CMDS: for DOCK-ND-2**
+- **CMDS: for DOCK-ND-2**
 docker ps
 docker volume ls
 docker container exec -it <container id> bash
@@ -1834,7 +1834,7 @@ cd _data/
 ls -ltr
 docker ps
 
--**CMDS: for DOCK-ND-1**
+- **CMDS: for DOCK-ND-1**
 docker service ls
 docker service rm my_service
 
@@ -1842,7 +1842,7 @@ docker service rm my_service
 - On logging in docker node 2, the container is removed. Howeve, if you still look into Docker volumne,
 - you will see the volume still persists.
 
--**CMDS: for DOCK-ND-2**
+- **CMDS: for DOCK-ND-2**
 docker ps
 docker volume ls
 ls -ltr 
@@ -1860,13 +1860,13 @@ Refer `Output 28`
 - 3. Placement Constraints [only run on nodes with label pci_compliance=true]
 - 4. Placement Preferences
 
--**CMDS: --> Not working in AWS Linux**
+- **CMDS: --> Not working in AWS Linux**
 docker node ls
 docker service create --name my_constraint --constraint node.labels.region==blr --replicas 3 nginx
 docker service ps my_constraint
 -docker node inspect <node-id>
 
--**CMDS: --> Currently the below commands are working in AWS Linux (USE ME)**
+- **CMDS: --> Currently the below commands are working in AWS Linux (USE ME)**
 docker node ls
 docker service ls
 -docker node update --label-add region=mumbai <node-id>
@@ -1919,28 +1919,78 @@ docker network ls
 -**CMD:DOCK-ND-3**
 docker network ls
 
--**CMD:DOCK-ND-2**
+- **CMD:DOCK-ND-2**
 docker ps
 docker container inspect <container-id> | grep IPAddress
 - Our objective is to find the IP Address of the container.
 - Ex: 10.0.2.4
 
--**CMD:DOCK-ND-3**
+- **CMD:DOCK-ND-3**
 docker ps
 docker container inspect <container-id> | grep IPAddress
 - Our objective is to find the IP Address of the container.
 - Ex: 10.0.2.3
 
--**CMD:DOCK-ND-1**
+- **CMD:DOCK-ND-1**
 docker ps
 docker container exec -it <container-id of my_overlay> bash
 apt update && apt install -y iputils-ping
 ping 10.0.4.3
 ping 10.0.4.5
 
--**CMD:DOCK-ND-1 -> to remove**
+- **CMD:DOCK-ND-1 -> to remove**
 docker service rm my_overlay
 docker network rm my_network
+
+- Refer `Output 30`
+
+### Secure Overlay Network
+- The overlay network driver creates a distributed network among multiple Docker daemon host.
+- Overlay network allows containers connected to it to communicate securely.
+- If containers are communicating with each other, it is recommended to secure the communication.
+- To enable encryption, when your create an overlay network pass the --opt encrypted flag:
+
+- **CMDs:**
+docker network create --opt encrypted --driver overlay my-overlay-secure-network
+docker network ls
+docker network rm my-overlay-secure-network
+
+- When you enable overlay encryption, Docker creates IPSEC tunnels between all the nodes where tasks are scheduled
+- for services attached to the overlay network.
+- These tunnels also use the AES algorithm in GCM mode and manager nodes automatically rotate the keys every 12 hours.
+- Overlay network encryption is not supported on Windows. If a window node attempts to connect to an encrypted overlay network,
+- no error is detected but the node will not be able to communicate.
+
+### Creating swarm services using Templates
+- We can make use of templates while running the service create command in swarm.
+- **Example:**
+- docker service create --name demoservice --hostname="{{.Node.Hostname}}-{{.Service.Name}}" nginx
+- <hostname> <servicename>
+
+- **Supported flags for the placeholder templates:**
+- --hostname , --mount , --env
+
+- **CMDS:**
+docker service create --name nginx_service --hostname="{{.Node.Hostname}}-{{.Service.Name}}" nginx
+docker ps
+hostname
+docker inspect <container_id> | grep Hostname
+<hostname> <servicename>
+docker container exec -it <container-id> bash
+hostname
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
