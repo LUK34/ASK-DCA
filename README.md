@@ -1802,11 +1802,50 @@ docker service ps mi_webserver
 
 ### Mounting volumes in CONTAINER
 - docker container exec -it <container id> bash
--**CMDS:**
+- here /mypath is the mount
+- let's say that the container that was created is an important container and something wrong happened and it got terminated.
+- So even if it gets terminated, all the data that you might have if you are storing it in the `/mypath` directory, 
+- you will still be able to access it irrespective of the container lifecycle.
+- And this is the reason why it is important to have volumes specifically for the containers which are going to store some important data.
+
+- **sudo -i**: If you're often accessing root-only folders, using sudo -i to enter an interactive root shell can make it easier.
+
+-**CMDS: for DOCK-ND-1**
 docker service create --name my_service --mount type=volume,source=myvolume,target=/mypath nginx
 docker service ps my_service
 docker volume ls
+
+-**CMDS: for DOCK-ND-2**
+docker ps
+docker volume ls
+docker container exec -it <container id> bash
+ls -ltr
+cd /mypath
+ls -ltr
+touch test.txt
+exit
+docker volume ls
+sudo -i
+cd /var/lib/docker/volumes/
+ls -ltr
+cd myvolume
+ls -ltr
+cd _data/
+ls -ltr
+docker ps
+
+-**CMDS: for DOCK-ND-1**
+docker service ls
 docker service rm my_service
+
+- Based on the above example. Once we remove the service from node 1. When we remove the service the task will also be removed.
+- On logging in docker node 2, the container is removed. Howeve, if you still look into Docker volumne,
+- you will see the volume still persists.
+
+-**CMDS: for DOCK-ND-2**
+docker ps
+docker volume ls
+ls -ltr 
 
 
 
