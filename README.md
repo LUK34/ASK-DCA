@@ -1847,19 +1847,100 @@ docker ps
 docker volume ls
 ls -ltr 
 
+Refer `Output 28`
 
 
+### Control Service Placement:
+- Amazon ECS can place the containers based on various factors like the availability zones or even instance types.
+- Now, similarly, Docker Swarm also has the capability to push the task or containers on the worker nodes depending upon the specific constraints that we can specify.
 
+- Swarm services provide a few different ways for you to control scale and placement of services on different nodes.
+- 1. Replicated and Global Services
+- 2. Resource Constraints [requiremnet of CPU and Memory]
+- 3. Placement Constraints [only run on nodes with label pci_compliance=true]
+- 4. Placement Preferences
 
+-**CMDS: --> Not working in AWS Linux**
+docker node ls
+docker service create --name my_constraint --constraint node.labels.region==blr --replicas 3 nginx
+docker service ps my_constraint
+-docker node inspect <node-id>
 
+-**CMDS: --> Currently the below commands are working in AWS Linux (USE ME)**
+docker node ls
+docker service ls
+-docker node update --label-add region=mumbai <node-id>
+-docker node inspect <node-id>
 
+- Using `docker node inspect <node-id>`. We will get all the details present in the JSON structure.
+- check for the part having json structure like
+"Spec":{
+	"Labels":{
+		"region": "blr",
+		"us-east": ""
+	}
+	....
+}
 
+Refer `Output 29`
 
+### Overview of Overlay Networks
+- The overlay network driver creates a distributed network among multiple Docker daemon hosts.
+- Overlay network allows containers connected to it to communicate securely.
 
+- So let's say that this is a swarm cluster and there are multiple nodes which are running and the containers are in a different node.
+- So let's assume here that you have three containers in three different virtual machine and each virtual machine has its own Docker daemon and they are part of the swarm cluster.
+- Now if a web server container of Node one wants to communicate with the web server container of Node two,
+- or if a web server container of node one wants to communicate with the web server container of Node zero three,
+- then this is not possible with the bridge or this is not possible with the host network.
+- So in order for the communication to happen, we need to make use of the overlay network.
 
+### Creating custom overlay network for Swarm
+- Create a service and define the network which is associated with that specific service.
+- We also learned that if you create a network h- ere and if you create a service defining this specific network, the network will get propagated.
 
+- ** ---- IMPORTANT ---- ** 
+- Security Group apply inbound rule for worker nodes (DOCK-ND-2 , DOCK-ND-3) + Manager node. Setup the below ports.
+- Without the below ports,
+2377	Custom TCP
+7946	Custom TCP
+7946	Custom UDP
+4789	Custom UDP
 
+-**CMDS:DOCK-ND-1**
+docker network create --driver overlay my_network
+docker network ls
+docker service create --name my_overlay --network my_network --replicas 3 nginx
+docker node ls
 
+-**CMD:DOCK-ND-2**
+docker network ls
+
+-**CMD:DOCK-ND-3**
+docker network ls
+
+-**CMD:DOCK-ND-2**
+docker ps
+docker container inspect <container-id> | grep IPAddress
+- Our objective is to find the IP Address of the container.
+- Ex: 10.0.2.4
+
+-**CMD:DOCK-ND-3**
+docker ps
+docker container inspect <container-id> | grep IPAddress
+- Our objective is to find the IP Address of the container.
+- Ex: 10.0.2.3
+
+-**CMD:DOCK-ND-1**
+docker ps
+docker container exec -it <container-id of my_overlay> bash
+apt update && apt install -y iputils-ping
+ping 10.0.4.3
+ping 10.0.4.5
+
+-**CMD:DOCK-ND-1 -> to remove**
+docker service rm my_overlay
+docker network rm my_network
 
 
 
