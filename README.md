@@ -1303,6 +1303,8 @@ to handle tasks like deployment, scaling,networking and monitoring.
 - Load balancing and traffic routing
 - Monitor Container health
 
+# DOCKER SWARM (IMPORTANT)
+
 ### LAB 15: Docker Swarm (Zeal Vohra)
 - Create 3 virtual machines (AWS Linux Machines)
 - DOCK-SWARM-ND-1
@@ -1979,10 +1981,147 @@ docker inspect <container_id> | grep Hostname
 docker container exec -it <container-id> bash
 hostname
 
+### Split brain problem and Quorum -> (Neal Vohra) -> Video 95
+- **Split Brain:**
+- Split brain refers to a scenario where a network partition causes multiple Swarm manager nodes to lose communication with each other.
+- As a result, more than one manager node (or group of nodes) believes it is the leader, leading to inconsistent cluster state and potential data corruption or service conflicts.
+- **Example:**
+- You have a Swarm with 5 manager nodes.
+- A network issue splits the cluster into two parts (e.g., 2 nodes in one partition and 3 in another).
+- If both partitions think they can elect a leader, both might attempt to manage the cluster independently.
+- This leads to conflicting decisions, which is the split brain problem.
+
+- **Quorum:**
+- Quorum is the minimum number of manager nodes that must agree (i.e., be online and able to communicate) to perform operations safely, especially leader election and cluster state updates.
+- **Formula for Quorum:**
+- Quorum=(𝑁/2)+1
+- Where N is the total number of manager nodes.
+- **Example:**
+- If you have 5 manager nodes, the quorum is 3.
+- If fewer than 3 nodes are available or communicating, the remaining nodes cannot elect a leader or make cluster decisions.
+
+- **Why Quorum Matters:**
+- Quorum prevents split brain. Docker Swarm will refuse to elect a new leader or process updates unless quorum is met.
+- This protects cluster integrity by ensuring only one valid leader is active.
+
+- **Important Points:**
+- Always use an odd number of manager nodes (e.g., 3, 5, 7) to avoid ties and optimize quorum.
+- For production, keep your manager nodes distributed across failure zones (e.g., different availability zones in AWS) to reduce the chance of a split brain.
 
 
+### Swarm Manage Node High Availability -> (Neal Vohra) -> Video 96
+- Manager nodes are responsible for handling cluster management task.
+- Let's say that you have one manager node, it is connected to two worker and this manager node has stopped working.
+- And tomorrow you have to scale up your service because a traffic is going to increase a lot.
+- So in that case, since the manager node is down, you will not be able to perform the scale up service or scale down service or any cluster management service with the swarm.
+- And this is the reason why it is very important that you have multiple manager nodes for high availability.
+
+- Manager Nodea has many responsibility within swarm, these include:
+- **Maintaining cluster state**
+- **Scheduling services**
+- **Serving swarm model HTTP API endpoints**
+
+- Swarm comes with its own fault tolerance features.
+- Docker recommends you implement an odd number of nodes according to your organization high-availability requiremnets.
+- Using a Raft implementation, the managers maintain a consistent internal state of the entire swarm and all the services running on it.
+- An N manager cluster tolerates the loss of at most (N-1)/2 managers.
+
+- ** For this example you must add 3 seperate nodes. Here all the 3 nodes are Manager nodes.**
+
+- **WATCH VIDEO 96: Neal Vohra**
+- **IMPORTANT NOTE: Token of the MANAGER NODE is different from the token of the WORKER NODE.**
+
+- **CMD:** docker swarm init --advertise-addr <Public IP Address of the Manager node>
+- This will generate a token for the worker nodes.
+
+- **CMD:** docker swarm join-token manager
+- This will generate a token for the manager nodes.
+
+- **Watch Video 95 ->99 -> IMPORTANT**
 
 
+### Docker System Commands:
+- **docker system info**
+- Shows general Docker system info
+
+- **docker system df**
+- Displays space used and reclaimable by Docker
+
+- **docker system events**
+- Streams real-time event logs
+
+- **docker system prune**
+- Cleans up stale resources (containers, networks, images, cache)
+
+- **docker system prune -a**
+- Also removes all unused images
+
+- **docker system prune --volumes**
+- Also removes anonymous volumes
+
+- **docker system prune -a --volumes**
+- Aggressive cleanup of nearly all unused objects
+
+
+# Kubernetes
+
+### Base:
+- Kubernetes (K8s) is an open-source container orchestration developed by google.
+- It was originally designed by google, and is now maintained by the Cloud Native Computing Foundation.
+
+### Architecture of Kubernetes:
+- A Kubernetes cluster consists of a **control plane** + **set of worker machines called nodes** that run containerized applications.
+
+- **Control plane**
+- This is the actual Kubernetes cluster.
+- So all of the main components that are part of Kubernetes, they are referred to as the control plane.
+
+- **Worker Nodes:**
+- These are the actual servers where the container application run.
+
+- **Basic Workflow:**
+- User communicates to Control Plane and provide necessary instructions to run containerized applications.
+- For example, user might want to run two containers of nginx  or user might want to run an application container, 
+- but not on the smaller server on the largest server that is available here.
+- So all of these requirements, the user will submit it to the control plane, which is the main Kubernetes master node.
+- Control plane will interpret the requirement, and it will go ahead and launch the appropriate container in the nodes that are available as part of the overall cluster.
+
+- **K8S Cluster Components**
+
+- ** (1) Control Node (Master Node)**
+- API Server
+- Schedular
+- Controller Manager
+- ETCD
+
+- ** (2) Worker Nodes**
+- Kubelet
+- Kube Proxy
+- Docker Runtime
+- POD
+- Container
+
+- To deploy our application using k8s then we need to communicate with control node.	
+- We will use KUBECTL (CLI) to communicate with control plane.
+- **API Server** will recieve the request given by "kubectl" and it will store that request in "ETCD" with pending status.
+- **ETCD** is an internal database of k8s cluster.
+- **Schedular** will identify pending requests available in ETCD and it will identify worker node to schedule the task.
+- Note: Schedular will identify worker node by using kubelet.
+- **Kubelet** is called as Node Agent. It will maintain all the worker node information.
+- **Kube Proxy** will provide network for the cluster communication.
+- **Controller Manager** will verify all the tasks are working as expected or not.
+- In Worker Node, "Docker Engine" will be available to run docker container.
+- In K8s, container will be created inside POD.
+- **POD** is a smallest building block that we can create in k8s cluster to run our applications.
+- Note: In K8s, everything will be represented as POD only.
+- Pods are used to deploy applications and manage their lifecycle within a Kubernetes environment.
+
+- **Popular feature of Kubernetes:**
+- Pod Auto-Scaling
+- Service discouvery and load balancing
+- Self-healing of containers
+- Secret management
+- Automated rollouts and rollbacks
 
 
 
