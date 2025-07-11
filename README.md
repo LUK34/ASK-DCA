@@ -103,8 +103,6 @@
 - By default, if we do not specify the continaer name, docker supplies randomly generated name from 2 words, joined by an underscore.
 
 
-
-
 ### Docker hub:
 - https://hub.docker.com/
 
@@ -2123,9 +2121,24 @@ hostname
 - Secret management
 - Automated rollouts and rollbacks
 
+- Ashok IT EKS Cluster video: https://youtu.be/is99tq4Zwsc?si=0h53-S7WFtDNwAMh
+- Ashok IT Devops Notes: https://github.com/LUK34/DevOps-Documents/blob/main/05-EKS-Setup.md
 
+### What is POD ?
+- POD is a smallest building block in k8s cluster.
+- Our application will be deployed as a POD only in k8s.
+- To create PODS we will use Docker images.
+- By using single docker image we can create multiple PODS also.
+- If we run our application with multiple PODS then we will get high availability.
+- Based on our demand we can increase our PODS count and we can decrease our PODS count.
+- To create PODS in k8s we will use manifest YML file.
 
-
+### What is YML?
+- YML stands for YET another markup language.
+- It is used to store the data in key-value format.
+- YML files are both human and machine readable.
+- YML file we can save with .yml or .yaml extension.
+- Official website : www.yaml.org
 
 
 
