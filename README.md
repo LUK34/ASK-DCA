@@ -2002,6 +2002,15 @@ hostname
 - Quorum prevents split brain. Docker Swarm will refuse to elect a new leader or process updates unless quorum is met.
 - This protects cluster integrity by ensuring only one valid leader is active.
 
+- **Important Points about Qourum**
+- Cluster Size = 1 , Majority = 0 , Fault Tolerance = 0
+- Cluster Size = 2 , Majority = 2 , Fault Tolerance = 0
+- Cluster Size = 3 , Majority = 2 , Fault Tolerance = 1
+- Cluster Size = 4 , Majority = 3 , Fault Tolerance = 1
+- Cluster Size = 5 , Majority = 3 , Fault Tolerance = 2
+- Cluster Size = 6 , Majority = 4 , Fault Tolerance = 2
+- Cluster Size = 7 , Majority = 4 , Fault Tolerance = 3
+
 - **Important Points:**
 - Always use an odd number of manager nodes (e.g., 3, 5, 7) to avoid ties and optimize quorum.
 - For production, keep your manager nodes distributed across failure zones (e.g., different availability zones in AWS) to reduce the chance of a split brain.
@@ -2014,7 +2023,7 @@ hostname
 - So in that case, since the manager node is down, you will not be able to perform the scale up service or scale down service or any cluster management service with the swarm.
 - And this is the reason why it is very important that you have multiple manager nodes for high availability.
 
-- Manager Nodea has many responsibility within swarm, these include:
+- Manager Node has many responsibility within swarm, these include:
 - **Maintaining cluster state**
 - **Scheduling services**
 - **Serving swarm model HTTP API endpoints**
@@ -2026,17 +2035,51 @@ hostname
 
 - ** For this example you must add 3 seperate nodes. Here all the 3 nodes are Manager nodes.**
 
-- **WATCH VIDEO 96: Neal Vohra**
 - **IMPORTANT NOTE: Token of the MANAGER NODE is different from the token of the WORKER NODE.**
+- ** DOCK-MNG-1 , DOCK-MNG-2, DOCK-MNG-3 **
+- **docker-install.sh  --> NEW* --> USE ME*
+#!/bin/bash
+sudo dnf update -y
+sudo dnf install -y docker
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker $USER
+docker --version
+
+- **CMD:**
+vi docker-install.sh
+chmod +x docker-install.sh
+./docker-install.sh
+
+- ** ---- IMPORTANT ---- ** 
+- Security Group apply inbound rule for all manager nodes (DOCK-MNG-1 , DOCK-MNG-2 , DOCK-MNG-3 ) + Manager node. Setup the below ports.
+- Without the below ports,
+2377	Custom TCP
+7946	Custom TCP
+7946	Custom UDP
+4789	Custom UDP
+
+- **CMDS:**
+hostname -I
 
 - **CMD:** docker swarm init --advertise-addr <Public IP Address of the Manager node>
 - This will generate a token for the worker nodes.
 
-- **CMD:** docker swarm join-token manager
+- **CMD: ---- ( USE ME ) ---- ** docker swarm join-token manager
 - This will generate a token for the manager nodes.
 
-- **Watch Video 95 ->99 -> IMPORTANT**
+- **CMDS: DCK-MNG-1**
+docker swarm init
+docker node ls
+docker swarm join-token manager
 
+- **CMDS: DCK-MNG-2**
+- <Copy the token from DCK-MNG-1 that is exclusively for manager nodes>
+
+- **CMDS: DCK-MNG-3**
+- <Copy the token from DCK-MNG-1 that is exclusively for manager nodes>
+
+- Refer `Output 31`
 
 ### Docker System Commands:
 - **docker system info**
@@ -2124,7 +2167,14 @@ hostname
 - Ashok IT EKS Cluster video: https://youtu.be/is99tq4Zwsc?si=0h53-S7WFtDNwAMh
 - Ashok IT Devops Notes: https://github.com/LUK34/DevOps-Documents/blob/main/05-EKS-Setup.md
 
-### What is POD ?
+### What is kubectl ??
+- The kubernetes command-line tool, kubectl, allows you to run commands against kubernetes clusters.
+- You can use kubectl to deploy applications, inspect and manage cluster resources and view logs.
+- To connect to Kbernetes Master, there are 2 important data which kubectl needs:
+- 1. DNS/IP of the cluster
+- 2. Authentication Credentials
+
+### What is POD ???
 - POD is a smallest building block in k8s cluster.
 - Our application will be deployed as a POD only in k8s.
 - To create PODS we will use Docker images.
@@ -2133,13 +2183,12 @@ hostname
 - Based on our demand we can increase our PODS count and we can decrease our PODS count.
 - To create PODS in k8s we will use manifest YML file.
 
-### What is YML?
+### What is YML ???
 - YML stands for YET another markup language.
 - It is used to store the data in key-value format.
 - YML files are both human and machine readable.
 - YML file we can save with .yml or .yaml extension.
 - Official website : www.yaml.org
-
 
 
 
