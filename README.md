@@ -2081,6 +2081,10 @@ docker swarm join-token manager
 
 - Refer `Output 31`
 
+### Run Manager only nodes in Swarm - Video 97
+- Container should NOT be run on MANAGER NODE. It should be run in WORKER NODE.
+
+
 ### Docker System Commands:
 - **docker system info**
 - Shows general Docker system info
@@ -2183,6 +2187,15 @@ docker swarm join-token manager
 - Based on our demand we can increase our PODS count and we can decrease our PODS count.
 - To create PODS in k8s we will use manifest YML file.
 
+### What is Kubernetes Objects ???
+- Kubernetes Objects is basically a record of intent that you pass on to the kubernetes cluster.
+- Once you create the object, the kubernetes system will constantly work to ensure that object exists.
+
+### Approach to configure an Object ???
+- There are various ways in which we can configure an Kubernetes Object.
+- First approach is through the kubectl commands.
+- Second approach is through configuration file written in YAML.
+
 ### What is YML ???
 - YML stands for YET another markup language.
 - It is used to store the data in key-value format.
@@ -2191,19 +2204,170 @@ docker swarm join-token manager
 - Official website : www.yaml.org
 
 
+### EKS Installation in AWS Linux Machine
+- **Note: Ashok It is using Ubuntu. Here you are using AWS Linux. So commands will vary.**
+- Ashok IT EKS Cluster video: https://youtu.be/is99tq4Zwsc?si=0h53-S7WFtDNwAMh
+- Ashok IT Devops Notes: https://github.com/LUK34/DevOps-Documents/blob/main/05-EKS-Setup.md
+- Here we are using Ubuntu image not AWS Linux Image so be carefull of the installation Commands
+
+
+- ** ---- FOR AWS LINUX ---- **
+- **Username:** ec2-user
+
+- 1. Launch new Ubuntu VM using AWS Ec2 ( t2.micro )
+- 2. Connect to machine and install kubectl using below commands.
+- **CMDS:**
+curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.19.6/2021-01-05/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin
+kubectl version --short --client
+
+- 3. Install AWS CLI latest version using below commands
+- **CMDS:**
+sudo dnf install -y unzip
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+aws --version
+
+- 4. Launch new Ubuntu VM using AWS Ec2 ( t2.micro )
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+eksctl version
+
+- 5. Create IAM role & attach to EKS Management Host
+Create New Role using IAM service ( Select Usecase - ec2 )
+Add below permissions for the role
+Administrator - acces
+Enter Role Name (eksroleec2)
+Attach created role to EKS Management Host (Select EC2 => Click on Security => Modify IAM Role => attach IAM role we have created)
+
+- 6. Create EKS Cluster using eksctl\
+- **CMD:**
+eksctl create cluster --name lrm-eks-cluster --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
+
+
+eksctl create cluster --name lrm-eks-cluster --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1
+
+- 7. After your practise, delete Cluster and other resources we have used in AWS Cloud to avoid billing
+- **CMD:**
+eksctl delete cluster --name lrm-eks-cluster --region us-east-1
+
+
+### K8S Manifest YML
+- To deploy our application in kubernetes we need MANIFEST YML file.
+- In k8s manifest YML we will write 4 sections.
+- apiVersion: <resource-version-number>
+- kind: <resource-type>
+- metadata: <resource-info>
+- spec: <container-info>
+
+### 01-Sample.yml
+-**CODE:**
+
+---
+id: 1234
+name: John
+gender: Male
+skills:
+ - Linux
+ - AWS
+ - DEVOPS
+...
+
+-**CMDS:**
+kubectl get pods
+kubectl apply -f 01-Sample.yml
+kubectl get pods
+kubectl logs <pod-name>
 
 
 
+### 02-pods.yml
 
+- **CODE:
+---
+apiVersion: v1
+kind: Pod
+metadata:
+ name: javawebapppod
+ labels:
+  app: javawebapp
+spec:
+ containers:
+  - name: javac1
+    image: ashokit/javawebapp
+    ports:
+     - containerPort: 8080
+...
 
+- Note: Save the above content in .yml file.
+- **CMDS:**
+kubectl get pods
+kubectl apply -f 02-pods.yml
+kubectl get pods
+kubectl logs <pod-name>
 
+### display in which worker node our pod is running
+- **CMDS:**
+kubectl get pods -o wide
 
+- **Note:** By default PODS can be accessed only with in the cluster. We can't access PODS outside.
+- To access PODS outside the cluster we need to expose the PODS by using K8S Services concept.
 
+### K8S Service
+- K8S service is used to group the pods and expose them for outside access.
+- In K8S we have 3 types of services
+- **(1) Cluster IP**
+- **(2) Node PORT**
+- **(3) Load Balancer**
 
+- When we deploy our application in k8s then PODS will be created for our application..
+- For every POD one IP will be generated.
+- PODS are short lived objects. We should not access PODS using POD IP because PODS can be destroyed and re-created at any point of time.
+- **Cluster IP:** It generates one static IP for all PODS based on POD label.
+- Ex: 192.168.10.89
+- **Note:** using ClusterIP we can access PODS only with in the cluster.
+- **Note:** PODS created , PODs Destroyed, PODS increased or decreased still ClusterIP will not change.
+- **Example:** Database PODS we should access only within in the cluster. Outside ppl should not access DB pods. In this scenario we can use CLUSTER IP service.
+- **Node PORT:** It is used to expose the PODS for outside access. 
+- Using NODE PUBLIC IP we can access PODS running in that node outside of the cluster also.
+- **Load Balancer:** It is used to expose the PODS for outside access.
+- When we can access LOAD BALANCER URL, it will distribute the load to all the nodes and all the PODS available for our application.
 
+### K8S Service Manifest YML
 
+- **CODE:**
+---
+apiVersion: v1
+kind: Service
+metadata:
+ name: javawebappsvc
+spec:
+ type: NodePort
+ selector:
+  app: javawebapp
+ ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30070
+...
 
+- **Note:** Save this data with .yml extesion
 
+- **CMDS:**
+kubectl get svc
+kubectl apply -f <svc-manifest-yml>
+kubectl get svc
+
+- **Note:** Enable NODE PORT in security group inbound rules.
+- **Note:** To access our application use below URL
+- **URL:** http://worker-node-public-ip:node-port/java-web-app/
+
+### What is NodePort ?
+- When we use service type as NodePort then k8s will use one random port number to expose our application on worker node for public access.
+- **Node Port Range** : 30,000 - 32767
+- **Note:** If we can also fix nodeport number in service manifest yml.
 
 
 
