@@ -2522,16 +2522,126 @@ kubectl delete pod pod-3
 - **Self-healing:** If a Pod crashes or a node fails, ReplicaSet automatically creates a replacement.
 - **Scaling:** Easily increase or decrease the number of Pods by changing the replica count.
 
+- **CODE: replicaset.yml**
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: kplabs-replicaset
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        tier: frontend
+    spec:
+      containers:
+      - name: php-redis
+        image: nginx
+
+
+- **CMDS:**
+kubectl apply -f replicaset.yml
+kubectl get replicaset
+kubectl get pods
+kubectl delete pod <first pod>
+kubectl get pods
+kubectl get pods --show-labels
+kubectl delete pods --all
+
+### Deployments in Kubernetes
+- **Challenges with ReplicasSets**
+- ReplicaSets works well in basic functionality like managing pods, sclaing pods and similar.
+
+- Deployments provides replication functionality with the help of ReplicaSets, along with various
+- additional capability like rolling out of changes, rollback chnages if required.
+
+- Kubernetes Deployment is a resource object used to manage stateless applications by providing features such as:
+- Rolling updates
+- Rollbacks
+- Scaling
+- Self-healing
+
+- deployment makes use of replica sets to make sure that there are always a specific number of replicas which are running
+
+- Deployment will create a new replica set. It will launch all the pods within that replica set and that replica set will be connected to the deployment.
+- Now once this pods within the replica set is running perfectly, then deployment will go ahead and it
+- will remove the pods associated with the previous application.
 
 
 
+- **CODE: deployment.yml**
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kplabs-deployment
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        tier: frontend
+    spec:
+      containers:
+      - name: php-redis
+        image: nginx
 
+- **CMDS:
+vi deployment.yml
+kubectl apply -f deployment.yml
+kubectl get replicaset
+kubectl get pods
 
+- Deployment will create a new replica set. It will launch all the pods within that replica set and that replica set will be connected to the deployment.
+- Now once this pods within the replica set is running perfectly, then deployment will go ahead and it
+- will remove the pods associated with the previous application.
 
+- **CODE: deployment.yml**
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kplabs-deployment
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        tier: frontend
+    spec:
+      containers:
+      - name: php-redis
+        image: nginx:1.17.3
 
+- **CMDS:
+kubectl apply -f deployment.yml
+kubectl get replicaset
 
+- After adding a specific version for nginx, you will see that there are two replica sets which are created here.
+- Now this is very similar to the architecture where we were discussing that in order for a new roll out change to happen,
+- deployment will create a second replica set and this second replica set will have the new version of your pods running.
+- Now, along with that, it will go ahead and it will also start to remove the pods which are present within the older replica set in a roll out fashion.
 
+- **CMDS:
+kubectl describe deployments kplabs-deployment
+kubectl get replicaset
+kubectl rollout history deployment.v1.apps/kplabs-deployment
+kubectl rollout history deployment.v1.apps/kplabs-deployment --revision 1
+kubectl rollout history deployment.v1.apps/kplabs-deployment --revision 2
 
+- The exact change is present in revision 2.
+
+- ** Important pointers for deployment**
+- Deployment ensure that only a certain number of pods are down while they are being updated.
+- By default, it ensures that at least 25% of the desired number of Pods are up (25% max unavailable).
+- Deployments keep the history of revision which had been made.
 
 
 
