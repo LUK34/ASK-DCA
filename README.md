@@ -2643,5 +2643,220 @@ kubectl rollout history deployment.v1.apps/kplabs-deployment --revision 2
 - By default, it ensures that at least 25% of the desired number of Pods are up (25% max unavailable).
 - Deployments keep the history of revision which had been made.
 
+### Deployment Configuration:
+- While performing a roll update, there are 2 important configuration to know.
+- **maxSurge: ** Maximum number of PODS that can be scheduled above original number of pods.
+- **maxUnavailable: **  Maximum number of PODS that can be unavailable during the update.
+
+**Example Use-Case**
+- Total PODS in deployment is 8.
+- maxSurge = 25%, maxUnavailable = 25% 
+- maxSurge = 2 PODS
+- maxUnavailable= 2 PODS
+- At Most of 10 PODS (8 current pods + 2 maxSurge pods)
+- At Least of 6 PODS (6 current pods - 2 maxUnavailable pods)
+
+- **CMDS:**
+kubectl create deployment demo-deployment --image=nginx
+kubectl set image deployment demo-deployment nginx=httpd
+kubectl get pods
+kubectl get pods
+
+- **CMDS:**
+kubectl edit deployment demo-deployment
+
+- Set the maxSurge from 25% to 0 or 10%. It can take % as well as count of pods, Follow the vi editor mechanism to update and save values.
+
+- **CMDS:**
+kubectl set image deployment demo-deployment nginx=nginx
+kubectl get pods
+
+### Kubernetes Secrets
+- A secret is an object that contains a small amunt of sensitive data such as password, a token or a key.
+- Allows customers to store secrets centrally to reduce risk of exposure.
+- Store in ETCD database.
+
+- **Multiple risks of hard coding credentials:**
+- 1. Anyone having access to the container repository can easily fetch the credentials.
+- 2. Developer needs to have credentials of production systems.
+- 3. Update of credentials will lead to new docker image being built.
+
+- **CMD:**
+kubectl create secret [TYPE][NAME][DATA]
+
+- Elaborating Type:
+- (1) Generic:
+- File (--from file)
+- directory
+- literal value
+- (2) Docker registry
+- (3) TLS
+
+-**CMDS:**
+kubectl get secret
+
+- ** ---- 1. Creating secret using generic type ---- **
+-**CMDS:**
+kubectl create secret generic firstsecret --from-literal=dbpass=mypassword123
+kubectl get secret
+kubectl describe secret firstsecret
+kubectl get secret firstsecret -o yaml
+
+- The password will be in a base 64 encoded format.
+- To decode the password
+-**CMDS:**
+- echo bXlwYXNzd29yZDEyMw== | base64 -d
+
+- ** ---- 2. To load the secret from a file ---- **
+- **CMDS:**
+vi credentials.txt
+kubectl create secret generic secondsecret --from-file=./credentials.txt
+kubectl get secret
+kubectl get secret secondsecret -o yaml
+
+- ** ---- 3. To load secret in YAML file PART 1 ---- **
+- Need to encode the username and password in base64 encoded version.
+- Fetch the decoded password. Open a new command prompt and type the following command to decode it.
+-**CMD:**
+echo <decoded-password>== | base64 -d
+echo -n 'dbadmin' | base64
+echo -n 'password123' | base64
+**CODE: secret-data.yml**
+apiVersion: v1
+kind: Secret
+metadata:
+  name: thirdsecret
+type: Opaque
+data:
+  username: ZGJhZG1pbg==
+  password: cGFzc3dvcmQxMjM=
+
+
+- To get the secret type the below command:
+-**CMD:**
+vi secret-data.yml
+kubectl apply -f secret-data.yml
+kubectl get secret thirdsecret -o yaml
+
+- ** ---- 4. To load secret in YAML file PART 2 ---- **
+- The below code will automatically encode the string. You dont have to encode it seperately
+**CODE: secret-stringdata.yml**
+apiVersion: v1
+kind: Secret
+metadata:
+	name: stringdata
+type: Opaque
+stringData:
+ config.yaml: |-
+	username: dbadmin
+	password: password123
+
+-**CMD:**
+vi secret-stringdata.yml
+kubectl apply -f secret-stringdata.yml
+kubectl get secret
+kubectl get secret stringdata -o yaml
+
+eksctl create cluster --name lrm-eks-clstr --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
+eksctl delete cluster --name lrm-eks-clstr --region us-east-1
+
+
+### Mounting Secrets in Containers
+- Once a secret is created, it is necessary to make it available to containers in a pod.
+- There are 2 approaches to achieve this:
+- 1. volumes
+- 2. Environment variables
+
+- Now in the environment variable type of approach, you have an environment variable which would have been created called as SECRET_USERNAME.
+- And this environment variable will basically have the value associated with the secret. So this is one of the approaches where your secret can be associated with a specific environment variable
+- and your application can basically fetch the value associated with a given environment variable to get the secret back.
+- Now, do remember that in both the approaches that we were discussing in Volume Mount as well as within the environment variable,
+- the secret which is being made available to the container is not encoded, it is within the decoded format.
+- So you don't really have to worry about your application having to decode the secret before using it.
+
+
+- **CODE: secretpod.yml**
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secretmount
+spec:
+  containers:
+  - name: secretmount
+    image: nginx
+    volumeMounts:
+    - name: foo
+      mountPath: "/etc/foo"
+      readOnly: true
+  volumes:
+  - name: foo
+    secret:
+      secretName: firstsecret
+
+- **CMDS:**
+kubectl get secret
+kubectl get secret firstsecret -o yaml
+kubectl apply -f secretpod.yml
+kubectl get pods
+kubectl exec -it secretmount -- bash
+cd /etc/foo
+ls -ltr
+cat dbpass
+cd ..
+ls -ltr
+
+	    
+- **CODE: secret-env.yml**
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-env
+spec:
+  containers:
+  - name: secret-env
+    image: nginx
+    env:
+      - name: SECRET_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: firstsecret
+            key: dbpass
+  restartPolicy: Never	  
+	  
+
+- **CMDS:**
+kubectl apply -f secret-env.yml
+kubectl get pods
+kubectl exec -it secret-env bash
+echo $SECRET_USERNAME
+
+
+
+eksctl create cluster --name lrm-eks-clstr --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
+eksctl delete cluster --name lrm-eks-clstr --region us-east-1
+
+### ConfigMaps:
+- In Kubernetes, a ConfigMap is an API object used to store non-confidential configuration data in key-value pairs. 
+- It allows you to decouple configuration artifacts from application code, making your applications more portable and easier to manage.
+
+- **Use Case:**
+- ConfigMaps are used to:
+- Inject configuration into Pods
+- Store command-line arguments, environment variables, or configuration files
+- Share common configuration across multiple Pods
+
+- **Note:**
+- Do not use ConfigMaps for sensitive data like passwords or API keys — use Secrets instead.
+- Changes to a ConfigMap do not automatically reload in running Pods unless explicitly reloaded or restarted.
+
+
+
+
+
+
+
+
+
+
 
 
