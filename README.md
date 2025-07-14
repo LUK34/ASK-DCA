@@ -2231,6 +2231,7 @@ sudo ./aws/install
 aws --version
 
 - 4. Launch new Ubuntu VM using AWS Ec2 ( t2.micro )
+- **CMDS:**
 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
 sudo mv /tmp/eksctl /usr/local/bin
 eksctl version
@@ -2243,15 +2244,15 @@ Enter Role Name (eksroleec2)
 Attach created role to EKS Management Host (Select EC2 => Click on Security => Modify IAM Role => attach IAM role we have created)
 
 - 6. Create EKS Cluster using eksctl\
-- **CMD:**
-eksctl create cluster --name lrm-eks-cluster --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
+- **CMDS:**
+- eksctl create cluster --name lrm-eks-cluster --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
 
 
-eksctl create cluster --name lrm-eks-cluster --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1
+eksctl create cluster --name lrm-eks-clstr --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
 
 - 7. After your practise, delete Cluster and other resources we have used in AWS Cloud to avoid billing
-- **CMD:**
-eksctl delete cluster --name lrm-eks-cluster --region us-east-1
+- **CMDS:**
+eksctl delete cluster --name lrm-eks-clstr --region us-east-1
 
 
 ### K8S Manifest YML
@@ -2262,9 +2263,15 @@ eksctl delete cluster --name lrm-eks-cluster --region us-east-1
 - metadata: <resource-info>
 - spec: <container-info>
 
-### 01-Sample.yml
--**CODE:**
+Kubernetes API Documentation URL Link:
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#pod-v1-core
 
+**CMDS:**
+kubectl explain pods
+
+### 01-Sample.yml
+
+-**CODE:**
 ---
 id: 1234
 name: John
@@ -2276,12 +2283,7 @@ skills:
 ...
 
 -**CMDS:**
-kubectl get pods
-kubectl apply -f 01-Sample.yml
-kubectl get pods
-kubectl logs <pod-name>
-
-
+<No need to run this is just an example of the structure of yml file>
 
 ### 02-pods.yml
 
@@ -2306,9 +2308,10 @@ spec:
 kubectl get pods
 kubectl apply -f 02-pods.yml
 kubectl get pods
-kubectl logs <pod-name>
+kubectl logs javawebapppod
 
-### display in which worker node our pod is running
+### Display which worker node our pod is running
+
 - **CMDS:**
 kubectl get pods -o wide
 
@@ -2316,26 +2319,55 @@ kubectl get pods -o wide
 - To access PODS outside the cluster we need to expose the PODS by using K8S Services concept.
 
 ### K8S Service
-- K8S service is used to group the pods and expose them for outside access.
-- In K8S we have 3 types of services
-- **(1) Cluster IP**
-- **(2) Node PORT**
-- **(3) Load Balancer**
 
 - When we deploy our application in k8s then PODS will be created for our application..
 - For every POD one IP will be generated.
 - PODS are short lived objects. We should not access PODS using POD IP because PODS can be destroyed and re-created at any point of time.
-- **Cluster IP:** It generates one static IP for all PODS based on POD label.
+
+- K8S service is used to group the pods and expose them for outside access.
+- In K8S we have 3 types of services
+
+- ** ---- (1) Cluster IP ---- **
+- It generates one static IP for all PODS based on POD label.
 - Ex: 192.168.10.89
 - **Note:** using ClusterIP we can access PODS only with in the cluster.
 - **Note:** PODS created , PODs Destroyed, PODS increased or decreased still ClusterIP will not change.
 - **Example:** Database PODS we should access only within in the cluster. Outside ppl should not access DB pods. In this scenario we can use CLUSTER IP service.
-- **Node PORT:** It is used to expose the PODS for outside access. 
-- Using NODE PUBLIC IP we can access PODS running in that node outside of the cluster also.
-- **Load Balancer:** It is used to expose the PODS for outside access.
-- When we can access LOAD BALANCER URL, it will distribute the load to all the nodes and all the PODS available for our application.
+- **What it does:** 
+- Exposes the service internally within the cluster.
+- Not accessible from outside the cluster.
+- **Use case:**
+- Internal microservices (e.g., backend talking to a database).
 
-### K8S Service Manifest YML
+- ** ---- (2) Node PORT ---- **
+- It is used to expose the PODS for outside access. 
+- Using NODE PUBLIC IP we can access PODS running in that node outside of the cluster also.
+- **What it does:**
+- Exposes the service on a static port on each Node’s IP address.
+- Enables external access to the application using <NodeIP>:<NodePort>.
+- **Use case:**
+- Quick way to expose services outside the cluster for development/testing.
+- **Key Points:**
+- Port range for nodePort is 30000-32767.
+- Access via: http://<NodeIP>:<NodePort>
+- Can expose only a limited number of ports this way.
+- Good for non-production or simple setups.
+
+- ** ---- (3) Load Balancer ---- **
+- It is used to expose the PODS for outside access.
+- When we can access LOAD BALANCER URL, it will distribute the load to all the nodes and all the PODS available for our application.
+- Load balancer will work with provider managed cluster service not with KubeAdm.
+- **What it does:**
+- Provisions an external load balancer (e.g., from AWS, Azure, GCP).
+- Automatically maps the service to a public IP address.
+- **Use case:**
+- Expose services to the Internet in production environments.
+- **Key Points:**
+- Requires a cloud provider that supports external load balancers.
+- The cloud provider allocates a public IP and configures a load balancer for you.
+- You can access your app with: http://<external-ip>:80
+
+### 03-NodePort.yml  -> K8S Service Manifest YML
 
 - **CODE:**
 ---
@@ -2357,7 +2389,7 @@ spec:
 
 - **CMDS:**
 kubectl get svc
-kubectl apply -f <svc-manifest-yml>
+kubectl apply -f 03-NodePort.yml
 kubectl get svc
 
 - **Note:** Enable NODE PORT in security group inbound rules.
@@ -2368,6 +2400,134 @@ kubectl get svc
 - When we use service type as NodePort then k8s will use one random port number to expose our application on worker node for public access.
 - **Node Port Range** : 30,000 - 32767
 - **Note:** If we can also fix nodeport number in service manifest yml.
+
+### 04-Pod-NodePort.yml  ->  POD and Service in Single Manifest YML
+
+- **CODE: **
+---
+apiVersion: v1
+kind: Pod
+metadata:
+ name: javawebapppod
+ labels:
+  app: javawebapp
+spec:
+ containers:
+  - name: javac1
+    image: ashokit/javawebapp
+    ports:
+     - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+ name: javawebappsvc
+spec:
+ type: NodePort
+ selector:
+  app: javawebapp
+ ports:
+  - port: 80
+    targetPort: 8080 
+    nodePort: 30070
+...
+
+
+- **Pod Definition**
+- **Kind:** Pod — you're deploying a single container (ashokit/javawebapp) that exposes port 8080.
+- **Label:** app: javawebapp — used by the service to select this pod.
+- **ContainerPort:** 8080 — this is the port inside the container where the app listens.
+
+- **NodePort Service**
+- **Kind:** Service (NodePort)
+- **Selector: app: javawebapp** — matches the Pod label so that the service can forward traffic to the pod.
+- **Port: 80** — the port on the service itself.
+- **TargetPort: 8080** — forwards traffic to the pod's container port.
+- **NodePort: 30070** — exposes the service on every node at this static port.
+
+- **CMDS:**
+kubectl apply -f 04-Pod-NodePort.yml
+kubectl get pods
+kubectl get svc
+
+
+### What is the difference between labels and selectors???
+- In Kubernetes, labels and selectors are closely related concepts but serve different purposes. Here's the difference between them:
+
+- **Labels:**
+- **Definition:** Labels are key-value pairs attached to Kubernetes objects (like Pods, Services, Deployments, etc.).
+- **Purpose:** They help you organize, group, and identify resources.
+- **Example:**
+metadata:
+  labels:
+    app: myapp
+    environment: production
+- **Use Cases:**
+- Identifying which app or component a resource belongs to.
+- Filtering objects in kubectl get commands.
+- Matching objects using selectors.
+
+- **Selectors:**
+- **Definition:** Selectors are queries used to find resources based on their labels.(Used for filteration of pod. E.g: dev and prod pods to filter)
+- **Purpose:** They enable controllers (like Services, ReplicaSets) to select and act on specific sets of resources.
+- **Types:**
+- Equality-based selectors (key=value)
+- Set-based selectors (key in (value1, value2))
+- **Example (used in a Service):**
+selector:
+  app: myapp
+  environment: production
+- This matches any Pod with both labels: app=myapp and environment=production.
+
+
+### Example: Implementing Labels and Selectors
+- **CMDS:**
+kubectl run pod-1 --image=nginx
+kubectl run pod-2 --image=nginx
+kubectl run pod-3 --image=nginx
+kubectl get pods
+kubectl get pods --show-labels
+
+- Commands to assign labels are as follows:
+- **CMDS:**
+kubectl label pod pod-1 env=dev
+kubectl label pod pod-2 env=stage
+kubectl label pod pod-3 env=prod
+kubectl get pods --show-labels
+
+- Selectors
+- **CMDS:**
+kubectl get pods -l env=dev
+kubectl get pods -l env=prod
+kubectl get pods -l env=stage
+kubectl get pods -l env!=dev
+
+
+- **CMDS: This removes the label named env from the Pod named pod-1.**
+kubectl label pod pod-1 env-
+kubectl get pods --show-labels
+kubectl label pods --all status=running
+
+- **CMDS: Pods are not meant to be stopped and restarted directly like traditional services. However, you can delete a Pod to stop it**
+- kubectl delete pod <pod-name>
+kubectl delete pod pod-1
+kubectl delete pod pod-2
+kubectl delete pod pod-3
+- kubectl delete pods -all
+
+
+### What is `ReplicaSet` in Kubernetes???
+- A ReplicaSet is a Kubernetes controller that ensures a specified number of identical Pod replicas are always running and available.
+- **High availability:** Keeps a consistent number of Pods running.
+- **Self-healing:** If a Pod crashes or a node fails, ReplicaSet automatically creates a replacement.
+- **Scaling:** Easily increase or decrease the number of Pods by changing the replica count.
+
+
+
+
+
+
+
 
 
 
