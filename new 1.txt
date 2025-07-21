@@ -1,0 +1,19 @@
+1. 
+After adding the tests that needs to be pushed from HIS -> Mirth.
+e.g:CT Lt. Ankle & foot
+
+I have enabled Medic Status privelege for `Doctors`.
+
+I logged in as doctor and have added the test.
+
+ When we select `Medic Send Out` yellow tag -> The color should change from yellow to grey
+ with `.... Sent` status.
+ 
+ **Previously the tag color was changing. But current context the tag color is NOT CHANGING**
+ 
+2.
+C:\Eclinic_Documents\Medic\IN folder is where the workorder is read by MIRTH.
+
+**ONLY ORM messages are getting generated. There are NO ADT message. KNG requires ADT messafes also**
+
+

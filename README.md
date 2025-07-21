@@ -2827,7 +2827,7 @@ spec:
 - **CMDS:**
 kubectl apply -f secret-env.yml
 kubectl get pods
-kubectl exec -it secret-env bash
+kubectl exec -it secret-env --bash
 echo $SECRET_USERNAME
 
 
@@ -2835,9 +2835,29 @@ echo $SECRET_USERNAME
 eksctl create cluster --name lrm-eks-clstr --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
 eksctl delete cluster --name lrm-eks-clstr --region us-east-1
 
-### ConfigMaps:
+### ConfigMaps: (Important Topic)
+- This concept is like your application.properties file in springboot app.
+- We have an AppA container and depending on the environment, its settings needs to be differed.
+- Example Properties:
+**Dev Enviroment:** app.env=dev app.mem=2048m app.properties=dev.env.url
+**Prod Enviroment:** app.env=prod app.mem=8096m app.properties=prod.env.url
+
+- config maps allows us to do is it allows us to centrally store data.
+- So what happens now is that instead of hard coding these things within the container image, what you do is you centrally store this data.
+- So currently you're centrally storing the data associated with the dev properties and you're centrally storing the data associated with the prod properties.
+
+- The second advantages of centrally storing data is that you can dynamically change the values. So let's say that tomorrow you want to add one more parameter within your configuration file.
+- If your configurations are stored centrally, then you can easily do that.
+- However, if your configuration files are hard coded within the container image, then if you want to change even a certain parameter, you will have to completely rebuild that specific image.
+- All right, so this method of centrally storing the data is achieved with the help of config maps within the Kubernetes.
+
 - In Kubernetes, a ConfigMap is an API object used to store non-confidential configuration data in key-value pairs. 
 - It allows you to decouple configuration artifacts from application code, making your applications more portable and easier to manage.
+
+- **CLI Syntax for creating ConfigMap**
+- **CMD:** kubectl create configmap [NAME][DATA-SOURCE]
+- the [DATA-SOURCE] can be File, directory, literal value.
+
 
 - **Use Case:**
 - ConfigMaps are used to:
@@ -2849,6 +2869,1640 @@ eksctl delete cluster --name lrm-eks-clstr --region us-east-1
 - Do not use ConfigMaps for sensitive data like passwords or API keys — use Secrets instead.
 - Changes to a ConfigMap do not automatically reload in running Pods unless explicitly reloaded or restarted.
 
+- ** ---- 1. Creating ConfigMap using literal value approach ---- **
+- **CMDS:**
+kubectl get configmap
+kubectl create configmap dev-config --from-literal=app.mem=2048m
+kubectl get configmap
+kubectl get configmap -o yaml
+
+- ** ---- 2. Creating ConfigMap using File ---- **
+- create a simple file called `dev.properties` and `prod.properties`
+
+- **dev.properties**
+app.env=dev
+app.mem=2048m
+app.properties=dev.env.url
+
+- **dev-configmap.yml**
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-pod
+spec:
+  containers:
+    - name: test-container
+      image: nginx
+      volumeMounts:
+      - name: config-volume
+        mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: dev-properties
+  restartPolicy: Never
+
+- **CMDS: for dev.properties**
+vi dev.properties
+kubectl create configmap dev-properties --from-file=dev.properties
+kubectl get configmap dev-properties -o YAML
+
+
+- **Explaination:**
+- In the Manifest file, So what we are doing, we are creating a simple pod.
+- The name of the pod is `configmap-pod` and we are launching it from the nginx container over here.So this is the first part. 
+- The second part is also something that you should already know by now where we are basically using the
+- volumes, where you have the `volumeMounts` and you have the `volumes`.
+- All right. Now within the `volumeMounts`, what we are doing is we are mount the mount path here is the `etc-config`
+- and within the volumes here we are referencing the `configMap` here.
+- So if you see the name of the volume is `config-volume`, the reference here is the `configMap` and this property is basically the name of the `configMap`.
+- So in our case the name of the `configMap` is `dev-properties`.
+- So what will happen is whatever data which was there within the `dev-properties` will be mounted inside the `etc-config` directory of your pod.
+
+
+- **prod.properties**
+app.env=prod 
+app.mem=8096m 
+app.properties=prod.env.url
+
+
+
+- **CMDS: for prod.properties**
+vi prod.properties
+kubectl create configmap prod-properties --from-file=prod.properties
+kubectl get configmap prod-properties -o YAML
+
+- **pod-configmap.yml**
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-pod
+spec:
+  containers:
+    - name: test-container
+      image: nginx
+      volumeMounts:
+      - name: config-volume
+        mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: dev-properties
+  restartPolicy: Never
+  
+ **CMDS:**
+kubectl apply -f pod-configmap.yml
+kubectl get pods 
+kubectl exec -it configmap-pod bash
+cd /etc/config
+ls
+cat dev.properties
+
+  
+eksctl create cluster --name lrm-eks-clstr --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
+eksctl delete cluster --name lrm-eks-clstr --region us-east-1
+
+
+### Services in Kubernetes
+
+- Pods are ephemeral in Kubernetes — they can be terminated, rescheduled, or recreated at any time. Because of this, Services play a vital role in ensuring consistent, reliable access to Pods.
+- ** What is a Service in Kubernetes?**
+- A Service is an abstraction that defines a logical set of Pods and a policy by which to access them — often called a microservice.
+- Think of it as a stable network endpoint that sits in front of one or more Pods and routes traffic to them.
+
+- ** Why Do We Need Services?**
+- **Pods:**
+- Get destroyed and recreated during updates, scaling, or failures.
+- Get new IP addresses every time they are recreated.
+- Without a stable way to reference them, clients wouldn't know how to reach the Pods. That’s where Services help.
+
+- **Key Functions of a Service:**
+- **Stable Network Identity:** Services get a static IP and DNS name inside the cluster.
+- **Load Balancing:** Distributes traffic among the Pods behind the service.
+- **Discovery:** Other components in the cluster can discover the service via DNS (my-service.my-namespace.svc.cluster.local).
+- **Decoupling:** Clients don’t need to know the dynamic IPs of Pods. They just talk to the service.
+
+- **Types of Services**
+- **ClusterIP:**	(Default) Accessible only inside the cluster.
+- **NodePort:**	Exposes the service on a static port on each Node’s IP.
+- **LoadBalancer:**	Provisions an external IP through cloud provider’s load balancer.
+- **ExternalName:**	Maps the service to an external DNS name (used for external services).
+
+- **CMDS:**
+```
+kubectl get pods
+```
+
+
+- To get the IP Address associated with all the pods.
+
+
+### Creating First Service and endpoint
+- **Service** is a gateway that distributes the incoming traffic between its endpoints**
+- **Endpoints** are the underlying PODS to which the traffic will be routed to.
+
+
+- **Step 1: Create backend PODS**
+- **CMDS:**
+```
+kubectl run backend-pod-1 --image=nginx
+kubectl run backend-pod-2 --imae=nginx
+```
+
+
+- **Step2: Create Frontend PODS**
+- **CMDS:**
+```
+kubectl run frontend-pod --image=ubuntu --command --sleep 3600
+```
+
+-  **Step 3:** 
+- what we'll be doing for it will be connecting to the frontend pod and  from the front end pod we will be making a request or to one of the backend pod that
+- we have created and we'll see if we're able to get the response back properly.
+- **CMDS:**
+```
+kubectl get pods -o wide
+kubectl exec -it frontend-pod -- bash
+```
+
+- **Step 4:**
+- Need to install `curl`
+- **CMDS:**
+```
+sudo dnf update && sudo dnf -y install curl
+curl <Ip-address of the backend pod 1>
+exit
+```
+
+- **Step 5:**
+-  we create a service and then we'll be associating our back in board with this specific service.
+- **CMDS:**
+```
+vi service.yml
+```
+
+**CODE: service.yml**
+```
+apiVersion: v1
+kind: Service
+metadata:
+	name: kplabs-service
+spec:
+	ports:
+	- port: 8080
+	targetPort: 80
+```	
+	
+**CMD:**
+```
+kubectl apply -f service.yml
+kubectl get service
+kubectl describe service kplabs-service
+kubectl exec -it frontend-pod -- bash
+curl <Ip-address of the backend pod 1>
+vi endpoint.yml	
+```
+
+**CMDS:**
+```
+kubectl get pods -o wide
+```
+
+**CODE: endpoint.yml**
+```
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: kplabs-service
+subsets:
+  - addresses:
+      - ip: <ip address of backend pod1>
+    ports:
+      - port: 80
+```
+
+**CMDS:**
+```
+kubectl apply -f endpoint.yml
+clstr
+kubectl describe service kplabs-service
+- You will get the IP address of backend pod 1
+kubectl exec -it frontend-pod -- bash
+curl <backend pod 1 ip address>:80
+```
+
+**CMDS: To delete the created resources**
+```
+kubectl delete service kplabs-service
+kubectl delete endpoints kplabs-service
+kubectl delete pod backend-pod-1
+kubectl delete pod backend-pod-2
+kubectl delete pod frontend-pod
+```
+
+### Understanding Cluster IP:
+- Whenever service type is ClusterIP, an internal cluster IP address is assigned to the service.
+- Since an internal cluster IP is assigned, it can be reachable from withing the cluster.
+- This is a default Service Type.
+
+### Challenges with Manual Approach for endpoints
+- At this stage, we were manually defining the IP Address of the PODS in endpoints
+- If there are 500 PODS, we will have to manually define each IP in ednpoint.
+
+### Intergration of Service with Selectors
+- Kubernetes allows us to define the list of labels of PODS that needs to be added as part of endpoints.
+- All PODS that matches that label will be added.
+
+- Whenever a client creates a service they can define to add all the pods with a label of app=nginx
+- So now whenever a service will be created, the end point of that service will be associated with the
+- IP Address associated with all the ports that has this specific label
+
+- **CMDS:**
+```
+vi demo-deployment.yml
+```
+
+- **CODE: demo-deployment.yml**
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+```
+
+- **CMDS:**
+```
+kubectl apply -f demo-deployment.yml
+kubectl get pods --show-labels
+vi service-selector.yml
+```
+
+- **CODE: service-selector.yml**
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: kplabs-service-selector
+spec:
+  selector:
+    app: nginx
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+**CMDS:**
+```
+kubectl apply -f service-selector.yml
+```
+
+**CMDS: Verify endpoints in Service**
+```
+kubectl describe service kplabs-service-selector
+```
+
+**CMDS: Scale Deployments**
+```
+kubectl scale deployment/nginx-deployment --replicas=10
+kubectl get pods
+kubectl get pods --show-labels
+kubectl get svc
+kubectl describe service kplabs-service-selector
+```
+
+
+**CMDS: To find the exact list of IP Addresses**
+```
+kubectl get endpoints
+kubectl describe endpoints kplabs-service-selector
+```
+
+- Lets say you create a new manual pod. And you add the same label `app-nginx` in this pod.
+- Whenever Kubernetes sees that a new pod is created with a specific label that is part of the `selector` of that `service`.
+- The service end point will automatically add this pod as well.
+
+**CMDS:**
+```
+kubectl run manual-pod --image=NGINX
+kubectl label pods manual-pod app=nginx
+kubectl get pods --show-labels
+kubectl describe service kplabs-service-selector
+```
+
+**CMDS: Delete Created resources**
+```
+kubectl delete service kplabs-service-selector
+kubectl delete -f demo-deployment.yml
+kubectl delete pod manual-pod
+```
+
+### Service Type: NodePort
+- NodePort exposes the Service on each Node's IP at a static port(NodePort)
+- You will be able to contact the NodePort Service, from outside the cluster, by requesting
+- <WorkerIP>:<NodePort>
+- If servicetype is NodePort, then Kubernetes will allocate a port(default:30000-32767) on every worker node.
+
+- Lets say that you have created a service of type `NodePort`. That is lets say for example
+- `kplabs-service` is of type `NodePort`
+- On the worker node say `Worker Node 1` a new node port will be created, lets say node port:31514
+- If anyone wants to connect to this service -> `kplabs-service`. So they will now have to connect to the worker node Public IP, 
+- followed by this specific node port and the request will be routed to the node port service.
+
+- **CMDS:**
+- **Step 1:** Create Sample POD with Label
+```
+kubectl run nodeport-pod --labels="type=publicpod" --image=nginx
+kubectl get pods --show-labels
+```
+
+- **Step 2:** Create NodePort service
+```
+vi nodeport.yml
+```
+
+- **CODE:**
+```
+appVersion: v1
+kind: service
+metadata:
+	name: kplabs-nodePort
+spec:
+	selector:
+		type: publicpod
+	type: NodePort
+	ports:
+	- port: 80
+	  targetPort: 80
+```
+	  
+- **CMDS:**
+```
+kubectl apply -f nodeport.yml
+```
+
+### Overview of the Networking model
+- Kubernetes imposes the following fundamental requirements on any networking implementation.
+- 1. pods on a node can communicate with all pods on all nodes without NAT.
+- 2. All nodes can communicate with all Pods without NAT.
+- 3. The IP that a pods sees itself as is the same IP that others see its as.
+
+- Challenges and Solutions:
+- Based on the constraints set, there are 4 different networking challenges that needs to be solved:
+- 1. Container to Container Networking
+- 2. Pod to Pod Networking
+- 3. Pod to Service Networking
+- 4. Internet to Service Networking
+
+- 1. Container to Container Networking:
+- 2. Container to Container networking primarily happens inside a pod.
+- 3. Pods can contain group of container with the same IP address.
+- 4. Communication between the containers inside pods happens via localhost
+
+-**CMDS:**
+```
+kubectl get pods
+kubectl get pods -o wide
+kubectl exec -it nginx --bash
+ifconfig
+```
+
+- Kuberenetes Ingress is a collection of routing rules which governs how external users access the Services
+- running within the Kuberenetes cluster.
+
+### Understanding Liveness Probe Health Checks
+- Many application running for long periods of time eventually transition to broken states,
+- and cannot recover except by being restarted.
+- Kubernetes provides liveness probes to detect and remedy such situations.
+
+-**CODE: livenessprobe.yml**
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness
+spec:
+  containers:
+  - name: liveness
+    image: ubuntu
+    tty: true
+    livenessProbe:
+      exec:
+        command:
+        - service
+        - nginx
+        - status
+      initialDelaySeconds: 20
+      periodSeconds: 5
+```
+
+- **CMDS:**
+```
+kubectl run -it ubuntu --image=ubuntu
+kubectl get pods
+kubectl exec -it <ubuntu pod id> service nginx status
+kubectl exec -it <ubuntu pod id> ls /tmp
+kubectl exec -it <ubuntu pod id> bash
+sudo dnf update && sudo dnf -y install nginx
+```
+
+- Initally it will say that nginx is not running.
+- If you execute the echo command and get a non 0 status, it means that nginx is not up and running 
+- and the previous command errored out.
+- `echo` command is primarily specific to linux.
+
+- **CMD:
+```
+service nginx status
+echo $?
+service nginx start
+echo $?
+service nginx status
+echo $?
+exit
+kubectl delete deployment ubuntu
+kubectl apply -f livenessprobe.yml
+kubectl get pods
+kubectl get pods
+```
+
+- when you exec -it into livenessprobe and check the nginx status.
+- This command will fail because there is no service nginx that is currently running.
+- When the service nginx is not running, which means that there is error.
+- The liveness probe will restart the overall container. Basically, it will kill and start the container.
+
+- **CMDS:**
+```
+kubectl get pods
+```
+
+- There are 3 types of probes which can be used with liveness:
+- 1. HTTP
+- 2. Command
+- 3. TCP
+
+
+### Overview of Readiness probe
+- It can happen that an application is running but temporarily unavailable to serve traffic
+- **Example:** 
+- Application is running but it is loading its large configuration files from external vendor.
+- It is like an Anti virus software which is running and receiving its patch updates from another server.
+- In such-case, we dont't want kill the container however we also do not want it to serve the traffic.
+
+- **CODE:**
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness
+spec:
+  containers:
+  - name: readiness
+    image: ubuntu
+    tty: true
+    readinessProbe:
+     exec:
+       command:
+       - cat
+       - /tmp/healthy
+     initialDelaySeconds: 5
+     periodSeconds: 5
+```	 
+	 
+- For the readinessProbe code that is present above. 
+- The command `cat /tmp/healthy` will be successfull if the file `/tmp/healthy` is present.
+- and if the file `/tmp/healthy` is not present, the command will fail + readiness probe will fail.
+
+- **CMDS:**
+```
+kubectl apply -f readinessprobe.yml
+kubectl get pods
+```
+
+- The pod will be in non ready state. which mean that the command will fail -> readiness probe will also fail.
+
+- **CMDS:**
+kubectl exec -it readiness touch /tmp/healthy
+
+- This will explicitly connect to the pod and will create this `healthy` file under the `tmp` directory
+- using the command `touch /tmp/healthy`
+
+- **CMDS:**
+```
+kubectl get pods
+```
+
+- If you see the status is running then the readiness probe is running.
+
+- **CMDS:**
+```
+kubectl exec -it readiness rm /tmp/healthy
+kubectl get pods
+kubectl exec -it readiness cat /tmp/healthy
+```
+
+- The readiness probe will fail.
+- So in summary, if the application is running it doesnt mean that it is ready to serve the traffic.
+- It can mean that it is doing lot of thing at the background, which is why the readiness probe is used to 
+- determine if the application is ready to use or not.
+
+### Understanding DaemonSets
+- Let's say that we have 3 nodes and we want to run a single copy of a pod in every node.
+So let's say that we have three worker nodes which are available and we want to run a single copy of a pod in every worker node.
+
+- So this can be better explained with a diagram where you have three worker node over here and you want to run a single copy of a pod.
+- Let's assume that its is a web server in every node over here. Now, if I have to ask you this question, what would be your outright answer?
+- So **the common answer that you will see is create a deployment with a replica set of three, which will go ahead and launch three pods, mostly in each and every node.**
+- So **this is the ideal case, but this can not always be true. It can happen in replica set and deployments that two copy or even three copy of a pod can be launched in a single node.**
+- So it all depends upon a lot of factors based on which the scheduling happens. **So with the typical use case, we cannot directly make use of replica sets and assume that scheduler will launch a single copy of pod in every node.**
+- So in order to achieve that you can make use of daemon set.
+
+- A DaemonSet can ensures that all Nodes run a copy of a Pod. As nodes are added to the cluster, Pods are added to them.
+- So one of the simple use case that I can share here is the antivirus. 
+
+- ** FIRST USE CASE: **
+- **So let's say that you have three worker nodes and what you want is you have an antivirus pod which regularly scans for all the files within the node to verify if it has some malicious data or not.**
+- So in such kind of a use case, ** you want to run your antivirus pod in each and every node and you don't want to run multiple copies of your antivirus pod.**
+- ** You just want to run a single copy of your antivirus pod in every node. So this is the first use case.**
+
+- ** SECOND USE CASE: **
+- ** Second is whenever a new node comes up, then that new node should also have a single copy of your antivirus pod.**
+
+
+- ** So the FIRST and SECOND USE CASE can be achieved with the help of daemon set.**
+
+
+- ** CODE: daemonset.yml **
+```
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kplabs-daemonset
+spec:
+  selector:
+    matchLabels:
+      name: kplabs-all-pods
+  template:
+    metadata:
+      labels:
+        name: kplabs-all-pods
+    spec:
+      containers:
+      - name: kplabs-pods
+        image: nginx
+```
+
+- ** CODE EXPALINATION: **
+- The name of the DaemonSet is kplabs-daemonset.
+- This defines the selector used to match the pods that this DaemonSet will manage.
+- It looks for pods with the label name: kplabs-all-pods.
+- This section defines the Pod template that the DaemonSet uses to create pods.
+- The pod will have the label name: kplabs-all-pods to match the selector.
+- The pod will run a single container named kplabs-pods.
+- It uses the nginx image, which means each node will have an nginx container running.
+
+- ** What Happens When You Apply This YAML: **
+- Kubernetes will schedule one nginx container on every node in the cluster.
+- If a new node is added later, Kubernetes will automatically run the same pod on the new node as well.
+
+- ** CMDS: **
+```
+kubectl get nodes
+kubectl apply -f daemonset.yml
+kubectl get pods
+kubectl get nodes -o wide
+```
+
+- ** Note: **
+- So anytime a new worker node gets created, your daemonset will go ahead and make sure that a pod is
+- created in that specific worker node.
+
+### Taints and Toleration:
+- Taints are used to repel the pods from a specific nodes.
+
+- **Example:**
+- So let's understand this with a simple example. Now, on the left hand side, you have a **worker node one** and on the right hand side you have the **worker node two**.
+- And along with that you have pod one and you have pod two. Lets say that you apply a taint on worker node one, so you can consider this to be a boundary. 
+- So there is a **taint** applied to the **worker node one**.
+- So now whenever there is a taint applied to a specific node and if a pod is scheduled within that specific node by default, it will be blocked.
+- So if a **scheduler** tries to **schedule a pod on a node which has been tainted, then the effect would be blocked**.
+- However, if you look into the worker node two, Node two does not have that taint.
+- And this is the reason why **if the same pod is being scheduled to the worker node two, it will be scheduled in that specific node.**
+- So this pod will be running in the worker node two. Now the question that comes is **how can you go ahead and schedule a pod in a worker node one which has a taint applied to it?**
+- So the **answer** to that is **tolerations**. ** So in order to enter the taint worker node, you need a special pass **.
+- So I call it as special pass. And this special pass is called as the Toleration.
+- So ** let's take the same scenario where you have a taint applied to a worker node 1.**
+- ** The pod is trying to schedule itself to this specific worker node 1, and it has also brought its special pass.**
+- ** And since it has this special pass, this pod will be allowed to be schedule within this worker Node one.**
+- So now this pod can go ahead and run in the worker node one along with that.
+- One important part to remember is that pod can also run in worker node two if it is scheduled over there, because worker node two does not really have the taint.
+
+- **CMDS:**
+```
+kubectl get nodes
+kubectl describe node <place worker node 1 name>
+kubectl taint nodes <worker node 1 name> key=value:NoSchedule
+kubectl describe node <worker node name>
+kubectl run nginx --image=nginx --replicas=5
+kubectl get pods -o wide
+```
+
+
+- **CMDS:**
+```
+vi toleration.yml
+kubectl apply -f toleration.yml
+kubectl get pods -o wide
+kubectl describe node
+```
+
+- **CMDS: To taint a particular node **
+```
+kubectl taint nodes <worker node 1 name> key=value:NoSchedule
+```
+
+- **CMDS: To untaint a particular node **
+```
+kubectl taint nodes <worker node 1 name> key=value:NoSchedule-
+```
+
+### Resource Requests and limits
+- If you schedule a large application in a node which has limited resource, 
+- then it will lead to `out of memory` exception or others and will lead to downtime.
+
+- Requests and Limits are 2 ways in which we can control the amount of resource that can be assigned to a pod (resource like CPU and Memory)
+- **Requests:** Guarenteed to get.
+- **Limits:** Makes sure that container does not take node resources above a specific value.
+
+- **CMD: requests-limits.yml**
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kplabs-pod
+spec:
+  containers:
+  - name: kplabs-container
+    image: nginx
+    resources:
+      requests:
+        memory: "640Mi"
+        cpu: "0.5"
+      limits:
+        memory: "12800Mi"
+        cpu: "1"
+```
+
+- ** First scenario: resources: requests: memory: "64Mi" **
+- ** First scenario: limits: memory: "128Mi" **
+
+- **CMDS:**
+```
+kubectl apply -f requests-limits.yml
+kubectl get pods -o wide
+kubectl get nodes
+kubectl describe node <worker node name>
+```
+
+- Kubernetes Scheduler decides the ideal node to run the pod depending on the requests and limits
+- If your POD requires 8GB of RAM, however there are no nodes within your cluster which has 8BG RAM.
+- then your pod will never get scheduled.
+
+- ** Pod Quality of Service (Qos)**
+- In Kubernetes, Guaranteed, Burstable, and BestEffort are Pod Quality of Service (QoS) classes that determine how CPU and memory resources are allocated and prioritized during contention.
+- These QoS classes affect scheduling and eviction behavior — especially when nodes run low on resources.
+
+- ** 1.Guarenteed **
+- Highest priority and most reliable.
+- **Requirements:**
+- Every container in the Pod must have requests = limits for both CPU and memory.
+- **Behavior:**
+- Guaranteed to get the resources it requests.
+- Last to be evicted during memory pressure.
+
+- ** 2.Burstable **
+- Medium priority.
+- ** Requirements: **
+- At least one container has requests and limits, but they are not equal.
+- Or, not all containers have both CPU and memory limits set.
+ -** Behavior: **
+- Gets minimum requested resources, but can burst up to the limit if available.
+- Evicted after BestEffort but before Guaranteed during pressure.
+
+- ** 3. BestEffort **
+- Lowest priority and least reliable.
+- **Requirements:**
+- No requests or limits specified for any container.
+- **Behavior:**
+- Gets leftover resources.
+- First to be evicted when node is under resource pressure.
+
+- **CMDS: delete the old pod first**
+```
+kubectl delete -f request-limits.yml
+```
+
+
+- **CMD:**
+```
+vi requests-limits.yml
+```
+
+- ** Second scenario: resources: requests: memory: "6400Mi" **
+- ** Second scenario: limits: memory: "128Mi" **
+
+- **CMD:**
+```
+kubectl apply -f requests-limits.yml
+```
+
+- You will expect an error saying that Invalid value: "6400Mi" must be less than or equal to memory limit.
+
+- ** Third scenario: resources: requests: memory: "6400Mi" **
+- ** Third scenario: limits: memory: "12800Mi" **
+
+- **CMD:**
+```
+kubectl apply -f requests-limits.yml
+kubectl get pods
+kubectl describe pod
+```
+
+### Network Policies in Kubernetes:
+- Pods are non-isolated, they accept traffic from any source.
+- **Example:**
+- Pod 1 can communicate with Pod 2
+- Pod 1 in namespace DEV can communicate with POD 3 in namespace Staging.
+
+
+- Sceanrio 1: Pod Compromise
+**CODE: nsp-deny-pod.yml**
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-pod
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+        run: pod01
+  policyTypes:
+  - Ingress
+  - Egress
+```
+
+- **CMDS:**
+```
+kubectl run -it pod01 --image=bus
+exit
+```
+
+- **CMDS:**
+```
+hostname -I
+- Obtain the ip address and open a new mobaxterm cmd and run ping <Ip address>
+kubectl apply -f nsp-deny-pod.yml
+```
+
+- **CMDS:**
+```
+kubectl run -it pod02 --image=bus
+exit
+```
+
+
+
+### Are Pods Containers?
+- Not exactly. A Pod is the smallest deployable unit in Kubernetes. It can contain one or more containers.
+- Think of a Pod as a wrapper around containers that shares the same network namespace and storage volumes.
+- Most Pods typically run one container, but multiple containers can be grouped in a Pod if they need to work closely together (like a helper process).
+
+### Are Containers Linux Machines?
+- No. Containers are isolated environments running on the same OS kernel of the host machine (usually Linux, but can be Windows too).
+- They are not full Linux machines or VMs. They are lightweight, using cgroups and namespaces for resource isolation.
+- You can run Linux-based applications inside them, but they share the host OS kernel.
+
+### What is a Node in Kubernetes?
+- A Node is a worker machine in Kubernetes. It can be:
+-  A physical server or a virtual machine
+- Each Node runs:
+- ** Kubelet: **  agent that talks to the Kubernetes control plane.
+- ** Container runtime: ** like Docker, containerd, etc., to run containers.
+- **Kube-proxy: ** handles networking for the Pods on that Node.
+- ** Nodes are where pods actually run.**
+
+
+
+# ---- Installation and Configuration of Docker EE ---- 
+
+- watch Zeal Vohra videos. Docker EE is enterprise edition and is valid for 1 month only so if you are practicing you may have to pay for it.
+
+
+** CMDS: to install DockerEE in AWS Linux**
+```
+export DOCKERURL="INSERT-YOUR-URL-HERE"
+ 
+echo "7" > /etc/yum/vars/dockerosversion
+ 
+sudo -E sh -c 'echo "$DOCKERURL/centos" > /etc/yum/vars/dockerurl'
+ 
+yum-config-manager --add-repo $(cat /etc/yum/vars/dockerurl)/docker-ee.repo;
+ 
+yum -y install docker-ee docker-ee-cli containerd.io
+ 
+systemctl start docker
+```
+
+- ** Step by Step docker installation in AWS Linux**
+- ** CMDS: **
+- Step 1: Update the system
+```
+sudo yum update -y
+```
+
+- Step 2: Install Docker (Amazon Linux 2 uses its own repo with Docker package)
+```
+sudo amazon-linux-extras enable docker
+sudo yum install -y docker
+```
+
+- Step 3: Start the Docker service
+```
+sudo systemctl start docker
+```
+
+- Step 4: Enable Docker to start on boot
+```
+sudo systemctl enable docker
+```
+
+- Step 5: (Optional) Add current user to the docker group to run Docker as non-root
+```
+sudo usermod -aG docker $USER
+```
+
+- Step 6: Verify Docker installation
+```
+docker version
+```
+
+- **Installing Docker UCP**
+docker container run --rm -it --name ucp -v /var/run/docker.sock:/var/run/docker.sock docker/ucp:3.1.4 install --host-address 139.59.82.72 --force-minimums
+
+- In Docker Universal Control Plane (UCP), Access Control refers to managing who can do what within a Docker Enterprise cluster.
+- UCP implements Role-Based Access Control (RBAC) to securely manage user permissions for resources like services, containers, volumes, and secrets.
+
+- ** Key Concepts of UCP Access Control**
+
+- ** 1. Users and Teams **
+- **Users:** Can be created in UCP or integrated via LDAP/AD.
+- **Teams:** Groups of users. Access control is usually applied to teams rather than individual users for easier management.
+
+- ** 2. Roles **
+- Roles define what actions can be performed. There are default roles, and you can also create custom roles.
+- **Role: ** View Only
+- **Permissions: ** Can view resources, but cannot modify them
+- **Role: ** Restricted Control
+- **Permissions: **	Can perform limited management (e.g., restart container)
+- **Role: ** Full Control
+- **Permissions: **	Full admin rights over resources
+- **Role: ** None
+- **Permissions: ** No access
+
+- ** 3. Collections **
+- Collections are logical groupings of resources (services, nodes, volumes, etc.). Think of it as a namespace. Access control is applied per collection.
+
+- ** 4. Grants **
+- Grants assign roles to teams or users over specific collections.
+
+- ** How Access Control Works **
+- ** Example:**
+
+- You have:
+- **Team:** DevOpsTeam
+- **Collection:** /devops-app
+- **Role:** Full Control
+
+- You grant Full Control of /devops-app to DevOpsTeam. All members of that team can now fully manage containers, secrets, and services in that collection.
+
+- ** Access Control Flow**
+- User logs in to UCP
+- UCP checks the user's teams
+- UCP looks at the collection/resource being accessed
+- UCP checks if a team (or user) has a role for that collection
+- Access is granted or denied based on the role
+
+- **Common Resource Types Controlled**
+- Nodes
+- Stacks
+- Containers
+- Secrets
+- Volumes
+- Networks
+
+- ** Tips for Managing Access **
+- Use teams instead of managing access per user.
+- Use least privilege principle — only give users the permissions they need.
+- Regularly review access grants.
+- Create custom roles for specific workflows if default roles don't fit.
+
+- ** What is a Subject**
+- In Docker Universal Control Plane (UCP), a subject refers to an entity (user or team) to which access control policies (grants) are applied.
+
+- ** In a Grant Statement: **
+- Each grant in UCP consists of:
+- **Subject:** Who (User or Team)
+- **Role:**  What permissions
+- **Collection:** Where (resource group)
+
+- ** General:**
+- Subject -> Organisation -> Teams -> Users
+
+- ** Docker Trusted registry Installation **
+
+- ** 1. What is DTR (Docker Trusted Registry)?**
+- DTR stands for Docker Trusted Registry. It is an enterprise-grade image storage solution that integrates with Docker Enterprise and is used to store, 
+- manage, and secure Docker images in a private, on-premises registry. DTR is typically deployed alongside Docker Universal Control Plane (UCP) and Docker Engine in Docker Enterprise.
+
+- ** 2. What are the Features of DTR? **
+- Here are the key features of Docker Trusted Registry:
+- **Private Registry:**	Host Docker images in a secure, private environment.
+- **Role-Based Access Control:**	Integrates with UCP to allow fine-grained access to repositories.
+- **Image Signing (Content Trust):**	Enforces image integrity and authenticity using Docker Content Trust.
+- **Image Scanning:**	Automatically scans images for vulnerabilities (when used with Docker EE).
+- **LDAP/AD Integration:**	Supports enterprise directory services for authentication and access control.
+- **High Availability:**	Can be deployed in multi-node setups with replication for fault tolerance.
+- **Repository Mirroring:**	Mirrors upstream registries for caching and availability.
+- **Web UI & API:**	Includes a browser-based interface and REST API for managing images.
+- **Helm Chart Support:**	Supports Kubernetes deployments via Helm charts.
+- **Image Promotion:**	Enables controlled promotion of images from dev to production.
+
+
+- **Architecture of DTR:**
+- The architecture of Docker Trusted Registry involves several components working together within a Docker Enterprise environment:
++-----------------------+         +-----------------------+
+|  Developers / CI/CD   |  <--->  |   Docker Client (CLI) |
++-----------------------+         +-----------------------+
+                                          |
+                                          v
++------------------------------------------------------------+
+|                  Docker Universal Control Plane (UCP)      |
+|     (Authentication, RBAC, Security Policies)              |
++------------------------------------------------------------+
+                           |
+                           v
++------------------------------------------------------------+
+|                   Docker Trusted Registry (DTR)            |
+|    - Web UI                                                |
+|    - REST API                                              |
+|    - Image Storage Backend (S3 / NFS / Local Volume)       |
+|    - Metadata DB (typically internal to DTR)               |
+|    - Scanning Service (if enabled)                         |
++------------------------------------------------------------+
+                           |
+                           v
+                +----------------------------+
+                |  Storage (S3/NFS/Volume)   |
+                +----------------------------+
+
+
+
+- **DTR Node Roles:**
+- **Replica Nodes:** Each DTR replica handles image storage, API requests, and web interface.
+- **Storage Backend:** DTR can use a shared storage backend such as Amazon S3, NFS, or a local volume.
+- **UCP Integration:** DTR is tightly integrated with UCP for authentication, access control, and RBAC.
+- **Scanning Services (optional):** Integrated with security scanners to find vulnerabilities in images.
+
+
+- **CMD:** 
+```
+docker run -it --rm docker/dtr install --ucp-node node01 --ucp-username admin --ucp-url https://159.89.168.70 --ucp-insecure-tls
+```
+
+- **Uninstalling DTR:**
+```
+docker run -it --rm docker/dtr:2.6.3 destroy --ucp-insecure-tls
+```
+
+- **Blog to remove DTR entry from UCP:**
+- https://success.docker.com/article/extra-dtr-listed-in-ucp-31x-requiring-removal
+
+- **TLS Output:**
+- INFO[0006] Generated TLS certificate. dnsNames="[*.com *.*.com example.com *.dtr *.*.dtr]" domains="[*.com *.*.com 172.17.0.1 example.com *.dtr *.*.dtr]" ipAddresses="[172.17.0.1]"
+
+
+- ** Configuring Trusted CA and pushing images to DTR **
+- **CMDS:**
+```
+wget https://159.65.151.132/ca --no-check-certificate
+cp ca /etc/pki/ca-trust/source/anchors/example.com.crt
+update-ca-trust
+systemctl restart docker
+docker tag busybox:latest example.com/admin/webserver:v1
+docker push exam
+docker push example.com/admin/webserver:v1
+```
+
+- ** DTR Backup **
+- **CMDS:**
+```
+docker run --log-driver none -i --rm docker/dtr backup --ucp-url https://172.31.40.237 -ucp-insecure-tls --ucp-username admin --ucp-password YOUR-PASSWORD-HERE > backup.tar
+```
+
+- **What is DTR Webhooks??**
+- DTR Webhooks (Docker Trusted Registry)
+- **Definition:**
+- Webhooks in Docker Trusted Registry (DTR) are automated callbacks that notify external systems when certain events happen in the registry.
+- **Key Points:**
+- Used to integrate with CI/CD pipelines, security scanners, or monitoring tools.
+- Webhooks can be triggered on events such as:
+- 1. Image push
+- 2. Image pull
+- 3. Delete events
+- Configured via the DTR UI or API.
+- Payload typically includes metadata about the event: repository, tag, actor, etc.
+
+# Section 6: Security:
+
+### What is UCP Client??
+- UCP Client (Universal Control Plane)
+- ** Definition:**
+- The UCP client is used to interact securely with a Docker Enterprise cluster managed by Docker Universal Control Plane (UCP).
+- **Key Points:**
+- UCP client bundle provides TLS certificates and the correct DOCKER_HOST endpoint for secure access.
+- Allows secure use of docker CLI and kubectl to interact with UCP-managed resources.
+- Downloaded from the UCP web UI:
+- 1. Admin UI → My Profile → Client Bundle
+- Extract the bundle and source the env.sh to set up the environment:
+- **CMDS:**
+source env.sh
+docker info  # To test connection
+
+### What is Linux Namespace
+- ** Definition:**
+- Linux namespaces provide isolation of system resources between containers.
+- Types of Namespaces (important for exam):
+- pid – Process ID namespace
+- net – Network stack (interfaces, routing)
+- mnt – Mount points
+- ipc – Inter-process communication
+- uts – Hostname and domain
+- user – User and group IDs
+- **Purpose:**
+- Each container gets its own isolated set of namespaces, giving it the illusion of a dedicated system.
+
+
+### What is Control Groups (cgroups)
+- **Definition:**
+- Control Groups are a Linux kernel feature used by Docker to limit, prioritize, and isolate resource usage (CPU, memory, I/O, etc.) of containers.
+- **Key Points:**
+- Prevent one container from starving others of resources.
+- Examples of resource limits:
+- **--memory=512m**
+- **--cpus="1.5"**
+- Docker applies cgroups to containers to enforce these limits.
+- Essential for multi-tenant environments and resource control.
+
+
+### Limiting CPU for Containers
+-  --cpus=<value>
+- **Purpose:**
+- Limits the total CPU time a container can use across all cores.
+- **Example:**
+docker run --cpus="1.5" ubuntu
+- **Explanation:**
+- The container can use up to 1.5 CPU cores (150% of a single core).
+- This is a fractional and flexible CPU limit across all available CPUs.
+- Good for soft CPU limits in shared environments.
+
+ **--cpuset-cpus=<cpu_list>**
+- **Purpose:**
+- Restricts the container to specific CPU cores (by CPU ID).
+- **Example:**
+- docker run --cpuset-cpus="0,2" ubuntu
+- **Explanation:**
+- The container is pinned to CPU 0 and CPU 2 only.
+- Useful for performance tuning and CPU affinity.
+- Prevents context-switching between cores, improving efficiency for high-performance apps.
+
+### Reservation vs limits
+- ** ---- Reservation ---- **
+- **Purpose**
+- Minimum guaranteed resource allocation
+- **Enforced By**
+- Docker Swarm scheduler
+- **Effect**
+- Ensures enough resources are available on a node before placing the container
+- **Overcommitment**
+- No — scheduler avoids overloading
+- **Use Case**
+- Ensures service placement on nodes with required resources
+
+
+- ** ---- limits ---- **
+- **Purpose**
+- Maximum resource usage allowed
+- **Enforced By**
+- Linux kernel (via cgroups)
+- **Effect**
+- Prevents a container from overusing resources
+- **Overcommitment**
+- Yes — limit is enforced during runtime
+- **Use Case**
+- Protects host from resource exhaustion
+
+### Swarm MTLS (Mutual Transport Layer Security)
+- The nodes, which are part of a swarm, makes use of the **mutual transport layer** security,
+- also referred as the TLS to authenticate, authorize and encrypt the communications with the other nodes which are part of the swarm.
+- Now, by default, **whenever you initialize a swarm, the node in which you initialize the swarm becomes the manager node**,
+- and the manager node generates a new root **certificate authority (CA)** along with a key pair, which is used to secure the communication with the other nodes which joins the swarm.
+- You can specify your own externally-generated root CA, using the **--external-ca** flag of the docker swarm init command.
+
+- So each time a node joins the swarm, the manager issues a certificate to that node.
+- basically when you initialize a swarm, there is a root certificate authority.
+- the communication that happens between the manager node and the worker node and the communication
+- that happens between the manager node and the manager node is completely encrypted. This will prevent any outside attack.
+
+- To find the root certificate authority.
+- **Note:** You need 2 nodes (servers) -> DOCK-MNG-1, DOCK-WRK-1
+
+- **CMD: DOCK-MNG-1**
+docker node ls
+docker swarm init
+
+- Remember, by default the manager node generates a new root Certificate Authority (CA) along with key pair,
+- which are used to secure communication with other nodes that join the swarm.
+
+- **CMD: DOCK-MNG-1**
+```
+cd /var/lib/docker/swarm/certificates
+```
+
+- Here you will find a `swarm-root-ca.crt` and `swarm-node.key`. This is the certificate that will be created automatically.
+
+- The manager node also generates 2 tokens to use when you join additional nodes to the swarm: one worker token and one manager token.
+- **Each token includes the digest of the root CA's certificate and a randomly generated secret. (IMPORTANT) **
+- When a node joins the swarm, the joining node uses the digest to validate the root CA certificate from the remote manager.
+
+- Rotating the CA Certificate
+- Run `docker swarm ca --rotate` to generate a new CA certificate and key.
+
+- Now one of the question that comes is do I have to update the joint tokens of the existing worker nodes?
+- In the above command, docker generated a cross-signed certificate signed by previous old CA.
+- After every node in the swarn has a new TLS certificate signed by the new CA Docker forgets about the old CA certificate
+- and key material and tells all the nodes to trust the new CA certificate only.
+- Join tokens also changes accordingly.
+
+- **CMD: DOCK-MNG-1**
+```
+docker swarm joint-token worker
+```
+
+- This will give you the worker token which you can paste in worker node (DOCK-WRK-1) to join the swarm.
+- After pasting in worker node, under the manager node. execute the below comamnds
+
+- **CMD: DOCK-MNG-1**
+docker node ls
+
+- Now we need to find the TLS in worker node. so...
+
+- **CMD: DOCK-WRK-1**
+```
+cd /var/lib/docker/swarm/certificates
+ls -ltr
+```
+
+- Here under worker node, you can see the node certificate and the node key.
+- Now here in the second point we were discussing that each token includes the digest of the root CA certificate and a randomly generated secret.
+- So basically, whatever join token that you run in the worker node, it has the digest of the certificate authority.
+- So if a certificate authority has been changed, if there are any modification that has happened to the CA, then the join token will not work.
+- And this is very important because the worker node can verify with the help of join token that whatever certificate authority which was present while a token was generated that has not been modified.
+
+-**CMD: DOCK-WRK-1**
+```
+docker swarm leave
+ls -ltr
+```
+
+- All the certificates in the worker node will be removed.
+- Lets come to the manager node and rotate our certificate.
+
+-**CMD: DOCK-MNG-1**
+```
+docker node ls
+```
+
+- remove the worker node from the manager Node. Remove using the node id.
+
+-**CMD: DOCK-MNG-1**
+```
+docker node rm <node id of worker node>
+docker node ls
+docker swarm ca --rotate
+```
+
+- Now the certificate has been rotated
+
+-**CMD: DOCK-MNG-1**
+```
+docker swarm joint-token worker
+```
+
+- Take the joint token and paste in worker node.
+
+- Now in case the certificate authority has been rotated, then the TLS certificates of all the worker nodes and all the other nodes are also changed.
+
+-**CMD: DOCK-WRK-1**
+```
+cd /var/lib/docker/swarm/certificates
+ls -ltr
+md5sum swarm-node.crt
+```
+
+- On executing the md5sum command. So this digest basically means that if there is any modification that might happen to this specific node, then the digest value would change.
+
+-**CMD: DOCK-WRK-1**
+```
+md5sum swarm-node.key
+```
+
+- Now go to the manager node and rotate the certificate.
+
+-**CMD: DOCK-MNG-1**
+```
+docker swarm ca --rotate
+docker node ls
+```
+
+-**CMD: DOCK-WRK-1**
+```
+md5sum swarm-node.crt
+```
+
+- If you look at the value of the swarm node certificate of the current and previous value.
+- So basically whenever you rotate the certificate, the swarm will also rotate all the relevant certificates
+
+- ** Certificate Details:**
+- By default, each node in the swarm renews its certificate every 3 months.
+- You can configure this interval by running the docker swarm update --cert expiry <TIME PERIOD>
+- In the event that a cluster CA key or a manager node is compromised, you can rotate the swarm root CA
+- so that none of the nodes trust certificates signed by the old root CA anymore.
+
+
+### Docker Secrets
+- Docker secrets to centrally manage this data and securely transmit it to only those containers that need access to it.
+- Secrets are encrypted during transit and at rest in a docker SWARM
+- A given secret is only accessible to those services which have been granted explicit access to it, and only while those 
+- service tasks are running.
+
+- **CMDS: Only one node is needed**
+```
+docker swarm init
+docker swarm init --advertise-addr <public ip of the server>
+docker secret ls
+vi db_creds.txt
+```
+
+- **CODE: db_creds.txt**
+```
+username: dbadmin
+pass: dbadmin@123$#
+```
+
+- Inorder to create a secret do the following:
+
+- **CMDS:**
+```
+docker secret create dbcreds db_creds.txt
+docker secret ls
+```
+
+- Remember this secret is encrypted and if you execute `docker secret inspect dbcreds` you will not get the secret.
+
+- **CMDS:**
+```
+docker service create --name webserver --secret
+docker secret ls
+docker service create --name webserver --secret dbcreds nginx
+docker node ls
+docker ps
+```
+
+- **So since the service is associated with the secret, all the containers which are created within that specific service will have access to the secret.**
+
+- **CMDS:**
+```
+docker container exec -it <container id> bash
+```
+- secerts will be stored in run directory.
+
+- **CMDS:**
+```
+cd /run/
+ls -ltr
+cd secrets/
+ls -ltr
+cat dbcreds
+```
+
+### Docker Content Trust:
+
+- When we are downloading image from network or from internet, integrity becomes a true concern.
+- Now if there is a middleman who is sitting in between and he has modified the image, then the integrity changes.
+- Let's say if he has added some kind of a malicious thing within the image, then if you are running
+- that image in production, it will hamper your security and hence integrity becomes a true concern.
+
+- Now, the Docker Content Trust gives us the ability to verify both the integrity and the publisher. Of all the data received from the registry over any channel.
+- **Watch Video 195 of Zeal Vohra**
+- To enable Docker content trust, you have to enable a specific method:
+
+- **CMD:**
+```
+export DOCKER_CONTENT_TRUST=1
+```
+
+
+### Overview of Docker group
+
+**CMDS:**
+```
+useradd newuser
+su - newuser
+id
+docker ps
+vi /etc/group
+```
+
+- here u need to go to the line `docker:x:993`
+- docker:x:993: newuser
+
+- **CMDS:**
+```
+su - newuser
+docker ps
+sudo vi /root/test.txt
+```
+
+- It will ask for password. The issue if you enter any random password, it will not work
+- because this user does not have any sudo priveleges
+
+- **CMDS:**
+```
+logout
+useradd dockeruser
+usermod -aG docker dockeruser
+vi /etc/group
+```
+
+- Here you will see that `dockeruser` is automatically added.
+- Among both the approaches -> `usermod -aG docker dockeruser` is the recommended way.
+
+- **CMDS:**
+```
+su - dockeruser
+docker ps
+```
+
+- here u will see that the docker user is able to perform the docker commands.
+
+### Linux capabilities for DOCKER
+
+- **CMDS:**
+```
+docker run -dt --name cap-demo amazonlinux
+docker exec -it cap-demo bash
+whoami
+touch test.txt
+yum install -y e2fsprogs
+chattr +i test.txt
+```
+
+
+- It should immediately say that the Operation not permitted while setting flags on test.txt
+
+- **CMDS:**
+```
+whoami
+exit
+docker run -dt --name cap02 --cap-add LINUX_IMMUTABLE amazonlinux
+docker exec -it cap02 bash
+yum install -y e2fsprogs
+touch test.txt
+chattr +i test.txt
+```
+
+- The above command will work perfectly well.
+
+- **CMD:**
+```rm test.txt```
+
+- This operation is not permitted because this has an immutable bit set.
+
+- **CMD:**
+```echo "Hi" > test.txt```
+
+- Operation not permited because there is an immutable bit set.
+- To remove the immutable bit.
+
+- **CMD:**
+```
+chattr -i text.txt
+echo "Hi" > test.txt
+rm test.txt
+```
+
+### Priveleged containers
+- By default, docker container does not have many capabilities assigned to it.
+- Docker containers are also not allowed to access any devices.
+- Hence, by default, docker container cannot perform various use-case like run docker container inside a docker container.
+
+- Priveleged Container can access all the device on the host as well as have configuration in AppArmor or SELinux
+- to allow the container nearly all the same access to the hosta as process running outside container on the host.
+- 1. Limits that you set for priveleged containers will not be followed.
+- 2. Running a priveleged flag gives all the capabilities to the container.
+
+- **CMDS:**
+```
+docker run -dt --name amazonlinux amazonlinux bash
+docker ps
+cd /dev
+ls -ltr
+```
+
+- **CMDS:**
+```
+docker exec -it amazonlinux bash
+whoami
+cd /dev
+ls -ltr
+```
+
+- So within here, if we go into the dev directory, you will see the amount of devices which are associated
+- here is much more less than what was actually present within the host.
+- And this is the reason why if you do not really run a privileged container, it is considered to be
+- much more safer because many of the devices are not directly connected with your Docker container.
+- Now we will see the difference between running a normal container and priveleged container
+
+- **CMDS:**
+```
+exit
+docker run -dt --privileged amazonlinux bash
+```
+
+- So now what we have done is we have specified a privileged flag. So whatever container that will get started will be of type privileged.
+
+- **CMDS:**
+```
+docker ps
+docker exec -it <container-id> bash
+cd /dev
+ls -ltr
+```
+- You will see all the devices which were present within the host are also available within the container.
+- So if you want to perform certain operations over these devices, you can certainly do that. So this is one benefit.
+- Now the second benefit of privileged container is that the capabilities are not restricted here.
+
+- **CMDs:**
+```
+yum install -y e2fsprogs
+touch test.txt
+chattr -i test.txt
+```
+
+- So now if I quickly set an immutable bit to the test.txt, you see, it works perfectly well over here.
+- Now, the reason why it is working perfectly well is because the Linux capabilities are not restricted 
+- within the privileged containers as opposed to the capabilities of that of the Docker container.
+- **this is the reason why the usage of privileged containers is something which should be restricted.**
+
+
+# Section 7: Storage and volumes
+
+### Overview of Docker Storage drivers
+- A docker image is built up from a series of layers.
+- Storage Driver piece all these things together for you.
+- There are multiple storage drivers available with different trade-off.
+
+- Now whenever we create a container from an image, let's say that this is a Ubuntu image and we create a container from this specific image.
+- Now after creating a container, when we log in to the container and we run a `ls` command, 
+- you will be able to see that multiple files which are spanned across the layers are merged together and they are shown to you as a single output.
+
+- **CoW strategy: Copy on Write strategy**
+- Copy on Write means everyobe has a single shared copy of the same data until its written and then a copy is made.
+
+- let's understand this with an example.
+- So let's say you have a common file over here and there are two programs which needs to access the common file.
+- So in such cases, what will happen is both of these programs will make use of a single common file. You will not have two files which will be created.
+- Both the programs will use a single common file. Now let's say you have a program three Again, that program three wants to have access to the common file.
+- Again, it will use that same common file. So in this way you have resources which will be shared and disk space will be saved.
+
+- Now the question is what happens when a write is being made to this specific file?
+- And in this case there is a little different strategy.
+- So when a write operation happens within the cow strategy, what happens is that common file is being copied to the layer where the write is happening.
+- So let's assume that program one is running on layer three of the Docker image, and Layer three is making some write changes to the common file.
+- So now the common file which was shared over here, it will be copied to the layer three and then whatever write which was supposed to happen, that would happen at the layer three approach.
+
+- **Watch video 200 of Zeal Vohra course. IMPORTANT**
+
+- Let's say this file in layer three is of 500 MB and you are making a change to this specific file. So this file will be copied to your container layer completely.
+- So the entire 500 MB gets copied to this container layer and the change would be made at this specific container layer.
+- Now whenever a read operation happens, Docker storage driver will ensure that if the file exists in this container layer, it will not read the file in the below layer altogether.
+- It will read the file from the container layer, which is the read and write layer over here.
+
+- **CMDS:**
+```docker INFO```
+
+- The storage driver details will be present over here.
+
+- **CMDS:**
+```
+cd /var/lib/docker
+ls -ltr
+```
+
+- You will see a name with directory storage driver.
+
+- **CMDS:**
+```
+cd <overlay driver>
+ls -ltr
+cd l
+ls -ltr
+docker pull ubuntu
+docker images
+ls -ltr
+```
+- On executing `ls -ltr` you will see multiple layers created over here. These directories are associated with layers.
+- Typically the lowest layer will have the highest size.
+
+- `Higher layer` is basically your `Container layer`
+- `Lower layer` is basically your `Image layer`
+
+- **Watch the video. Need to watch `video 200` multiple times**
+
+
+### Block and Object storage
+- **Block Storage**
+- In block storage, the data is stored in terms of blocks.
+- Data stored in blocks are normally read or written entirely a whole block at the same time.
+- Most of the files systems are based on block devices.
+- Every block has an address and application can be called via SCSI call via its address.
+- There is no storage side meta-data associated with the block except the address.
+- This block has no desciption, no owner.
+
+- **Object Storage**
+- Object storage is data storage architecture that manages data as objects as opposed to blocks of storage.
+- An **object is defined as a data (file)** along with all its meta-data which is combined together as an object.
+- This object is given an ID which is calculated from the content of the object (from the data and metadata).
+- Application can then call object with the unique object ID.
+
+- ** Difference between Object and Block Storage **
+- **Object Storage: **
+- Store virtually unlimited files.
+- Maintain file revisions.
+- HTTP(s) based inerface.
+- Files are distributed in different physical nodes.
+
+- **Block Storage;**
+- Files is split and stored in fixed sized block.
+- Capacity can be increased by adding more nodes.
+- Suitable for application which require high OPS, database, transactional data.
+
+### Changing Storage drivers
+- The default storage driver for docker is `overlay2`. Use `docker info`
+
+- one very important part to remember is that if we are going to change the storage driver, then
+- whatever data that we might have for the previous storage driver would be inaccessible and whatever containers which were launched would be inaccessible.
+
+- **CMDS:**
+```
+docker info
+docker container run -dt --name overlay2 nginx
+docker ps
+cd /var/lib/docker
+ls
+cd overlay2
+ls
+docker ps
+systemctl stop Docker
+cd /etc/docker/
+```
 
 
 
@@ -2860,3 +4514,84 @@ eksctl delete cluster --name lrm-eks-clstr --region us-east-1
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Managing Secrets in Docker SWARM
+
+### Docker Content Trust
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
