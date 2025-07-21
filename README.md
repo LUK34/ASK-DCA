@@ -4502,28 +4502,111 @@ ls
 docker ps
 systemctl stop Docker
 cd /etc/docker/
+ls
+vi daemon.json
 ```
 
+- **CODE: daemon.json**
+{
+  "storage-driver": "aufs"
+}
+
+```
+systemctl start docker`
+docker info
 
 
+```
 
+- when you check the `docker info`. Under the `Storage Driver` -> aufs will be present.
+- What we did was to change the default storage driver `overlay2` -> `aufs` in docker.
+- so when we execute commands `docker ps` and `docker ps -a` we will not be able to see the containers that were cretaed.
+- because they are made to be inaccessible.
 
+- **CMDS:**
+```
+cd /var/lib/docker
+ls -ltr
 
+```
+- there will be a directory of tupe `aufs`
 
+- **CMDS:**
+```
+docker container run -dt --name aufs nginx
 
+```
+- Here when we run the above command, the image will be pulled because of the storage driver change.
 
+- **CMDS:**
+```
+docker ps
+cd aufs
+ls -ltr
 
 
+```
 
+- this time the directory would be under the `aufs`.
+- So you see there is a different approach in which stores the data.
+- So all of the data that you might store in the container readwrite layer as well as the images would be part of the `aufs` directory here.
 
 
+### Docker volumes
+- **Challenges with files in Container Writeable Layer:**
+- By default all files created inside a container are stored on a writable container layer. This means that:
+- The data does not persist when that container no longer exist and it can be difficult
+- to get the data out of the container if another process needs it.
 
+- So docker has 2 options for container to store files in the host machine,
+- so that the files are persisted after the container stops: volumes and bind mounts.
+- If you are running Docker on Linux you can also use a tmpfs mount.
 
+- You need to make sure that a container is running.
+- **CMDS:**
+```
+docker ps
+cd /var/lib/Docker
+cd overlay2
+ls -ltr
+```
+- So this specific container, whatever data that you might be writing inside the container would be stored in a specific directory.
+- Now this directory, whatever container read and write layer that we were discussing.
+- So this read and write layer, whatever things that you will be writing here.
+- It depends upon the container lifecycle.
+- As we discussed, if the container is deleted, then whatever data that you might have written through
+- the read and write layer would also cease to exist.
+- So let's try it out.
 
+- **CMDS:**
+```
+ls -ltr
+docker ps
+docker stop mynginx
+docker rm mynginx
+ls -ltr
 
+```
 
+- Now it has been deleted. And if you want to recover data, there is no way to do that.
+- And this is the reason why for the applications which are stateless.
+- This type of architecture would not really matter.
+- But if you have a stateful application, so let's say that many organizations, they host their databases
+- like MySQL inside the container.
+- Now they do not really want that, that the container, if it gets deleted or if there are any issues
+- with the container, they would not be able to access the data.
+- ** So you have to keep the data of the container separately and the container separately.That is the recommended approach.**
+- So that can be achieved with the help of bind mounts as well as volumes.
 
+- **CMDS:**
+```
+docker volume ls
+docker volume create myvolume
+docker volume ls
+```
 
+- So the volume is created.
+- Now whatever container that we might launch, we can associate that containers directory with the volumes directory.
 
 
 
@@ -4566,32 +4649,5 @@ cd /etc/docker/
 
 
 
-### Managing Secrets in Docker SWARM
 
-### Docker Content Trust
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
