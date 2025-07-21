@@ -4608,6 +4608,302 @@ docker volume ls
 - So the volume is created.
 - Now whatever container that we might launch, we can associate that containers directory with the volumes directory.
 
+- **CMDS:**
+```
+docker container run -dt --name busybox -v myvolume:/etc busybox sh
+docker ps
+docker volume ls
+docker volume inspect myvolume
+cd /var/lib/docker/volumes/myvolume/_data/
+ls -ltr
+docker container exec -it busybox sh
+cd /etc
+ls -ltr
+df -h
+```
+
+- So if you basically do a `df -h`, you will see that the root file system is based on overlay.
+- And then you have the `etc` directory here. `etc` directory is within the volume of `/dev/vda1`.
+- So this is a different disk altogether when compared to the root volume.
+
+- **CMDS:**
+```
+exit
+cd /var/lib/docker/volumes/myvolume/_data/
+docker ps
+docker stop busybox
+docker rm busybox
+docker ps
+docker ps -a
+```
+
+- So the docker container will cease to exist. But remeber we are usig volumes,
+- so our read/write data will be saved in the volume.
+
+- So the container has been deleted. However, if you do an `ls -ltr` here you can see that the data continues to be present.
+- So this data, which is present within the volume, is independent about the container lifecycle.
+- So even if the container is deleted, the data still remains.
+
+- **CMDS:**
+```
+ls -ltr
+docker volume ls
+cd 
+docker volume rm myvolume
+docker volume ls
+```
+
+** Important Pointers:**
+- A given volume cane be mounted into multiple containers simultaneoulsy.
+- When no running container is using a volume, the volume is still available to Docker and is not removed automatically.
+- When you mount a volume, it may be named or anonymous. Anonymous Volumes are not given an explicit name when they are first
+- mounted into a container, so docker gives them a random name that is guarenteed to be unique within a given Docker host.
+
+### Bind Mounts
+- When you use a `bind mount`, file or directory on the host machine is mounted into a container.
+- The file or directory is referenced by its full or relative path on the host machine.
+
+- Let's say you already have a directory and there are certain contents inside that directory.
+- Now you want your container to be able to access the contents within the directory inside the host.
+- So in such cases you can make use of bind mounts.
+
+- ** CMDS: **
+```
+docker container run -dt --name nginx nginx
+docker ps
+docker inspect nginx
+docker container exec -t nginx bash
+cd /usr/share/nginx/html/
+ls -ltr
+```
+
+- You will see a default `index.html`. This is the default nginx html image.
+
+- ** CMDS: **
+```
+exit
+mkdir index
+cd index
+ls -ltr
+echo "Hello, this is bind mount file" > index.html
+docker container run -dt --name nginxbind01 -v /root/index/:/usr/share/nginx/html nginx
+```
+
+- Here we are running a container that specifies the directory under the host (`/root/index`)
+- and i also need to specify the directory under the container which is `/usr/share/nginx/html`
+
+- ** CMDS: **
+```
+docker ps
+docker inspect nginxbind01
+curl <IP Address of the container>
+docker container exec -it nginxbind01
+cd /usr/share/nginx/html/
+ls -ltr
+```
+
+- This is the index.html file which came from the host directory.
+- The host directory is basically the root index file.
+
+- ** CMDS: **
+```
+exit
+pwd
+```
+
+- Whenever you are creating a bind mount there are 2 ways to do bind mount.
+- **First way**
+- **CMDS:**
+```
+
+docker container run -dt --name nginxbind02 --mount type=bind,source=/root/index,target=/usr/share/nginx/html nginx
+docker ps
+docker inspect nginxbind02
+curl <Ip address of the container present inside `Networks`>
+docker container exec -it nginxbind02 bash
+cd /usr/share/nginx/html
+ls -ltr
+echo "This is my custom changes" >> index.html
+cat index.html
+
+```
+
+- **CMDS: Read Only bind mount**
+
+```
+docker container run -dt --name nginxbind03 --mount type=bind,source=/root/index,target=/usr/share/nginx/html nginx
+docker ps
+docker container exec -it nginxbind03 bash
+cd /usr/share/nginx/html/
+ls -ltr
+cat index.html
+echo "This is my 3rd change" >> index.html
+
+```
+
+- You will get a bash prompt saying that this is read only.
+
+### Automatically remove columen on container exist
+- Whenever a container is created with -dt flag and if the main process completes/stops, then it goes into the exited stage.
+- We can see list of all containers (Running/Exited) with docker ps -a command.
+- Many a times, container performs a job and we want container to automatically get deleted once it exits.
+- This can be achieved with the `--rm` option.
+
+- **CMDS:**
+```
+docker container run -dt --name container01 busybox ping -c10 google.com
+docker ps
+docker ps -a
+```
+
+- So now what we want is after the command or after the script has completed its execution, we don't
+- really want it to be in the exited stage because it will unnecessarily lead to disk usage.
+- So what we want is that the container should be removed automatically when the job is completed.
+- So in such cases you can make use of the `--rm` option.
+
+- **CMDS:**
+```
+docker container run --rm -dt --name container02 busybox ping -c10 google.com
+docker ps
+docker ps
+docker ps -a
+```
+
+- You need to wait for few seconds for the container to finish its 10 ping execution.
+- so when you add `--rm` into the container creation. Once the command finish execution, the container will be deleted thus preventing disk usage.
+
+- **CMDS:**
+```
+docker container run -dt --name container02 -v /testvolume busybox ping -c10 google.com
+docker volume ls
+docker ps -a
+```
+- The problem with the above approach is that the container will cease to exit after 10 pings but still the volume will persist.
+
+- **CMDS:**
+```
+docker container prune -y
+docker ps -a
+docker volume ls
+
+```
+
+- In our scenario, when we go for the volume +`--rm` approach, when the container is deleted, the volume will also to be deleted.
+- **CMDS:**
+```
+docker volume rm <volume id>
+docker container run --rm -dt --name container02 -v /testvolume busybox ping -c10 google.com
+docker ps
+docker volume ls
+docker ps -a
+docker volume ls
+```
+- So when we use `--rm`, when the container cease to exist, because we are using `--rm` option -> the container volume will also be deleted.
+
+
+### Device Mapper
+- The **device mapper is a framework** provided by the **Linux kernel** for **mapping physical block devices onto higher-level virtual block devices.**
+- Device mapper works by passing data from a virtual block device, which is provided by the device mapper itself, to another block.
+- Device mapper creates logical devices on top of physical block device and provide features like: RAID, Encryption, Cache and various others.
+
+- There are 2 modes for devicemapper storage driver:
+- **loop-lvm mode:**
+- Should only be used in testing enviroment
+- Makes use of loopback mechanism which is generally on the slower side.
+
+- **direct-lvm mode:**
+- Production hosts using the devicemapper storage driver must use `direct-lvm` mode.
+- This is much more faster then the loop-lvm mode.
+
+- **CMDS:**
+```
+vi /etc/docker/daemon.json
+```
+
+- **CODE:**
+```
+{
+ "storage-driver": "devicemapper"
+}
+```
+
+- **CMDS:**
+```
+docker info | grep -i storage
+docker images
+docker pull busybox
+docker container run -dt --name busybox busybox sh
+docker ps
+```
+- This container and this image is associated with storage driver.
+- The storage driver that we are usings is `overlay2` and we can identify it by using the command -> `docker info | grep -i storage`
+
+- **CMDS:**
+```
+systemctl restart Docker
+systemctl status docker
+docker info
+```
+
+- You will see a warning saying that `loop-lvm` will not be used. 
+- Remember `loop-lvm` is used in testing only. It is recommended to use `direct-lvm` mode.
+
+### Docker logging drivers
+- UNIX and Linux commands typically open 3 I/O streams when they run, called `STDIN`, `STDOUT` and `STDERR`
+- Similary to the above statement, docker also has similar commands.
+
+- **STDIN (Standard Input)**
+- **What it is:** The input stream, usually from the keyboard or piped input.
+- **Docker use:** If you want to interactively send input to a container (like entering commands or data), you can enable STDIN.
+- **Example:**
+```
+docker run -i ubuntu cat
+```
+
+- **STDOUT (Standard Output)**
+- **What it is:** The default output stream for displaying results.
+- **Docker use:** Everything printed to the terminal by the container (e.g., from echo, print, console.log) goes to STDOUT.
+- **Example:**
+```
+docker run ubuntu echo "Hello from container"
+```
+
+- **STDERR (Standard Error)**
+- **What it is:** The stream used for error messages and diagnostics.
+- **Docker use:** Any error messages from the container's application are sent to STDERR.
+- **Example:**
+```
+docker run ubuntu bash -c "ls /nonexistent"
+```
+
+**CMDS:**
+```
+docker ps
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
