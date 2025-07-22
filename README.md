@@ -3939,7 +3939,7 @@ docker run --log-driver none -i --rm docker/dtr backup --ucp-url https://172.31.
 - Configured via the DTR UI or API.
 - Payload typically includes metadata about the event: repository, tag, actor, etc.
 
-# Section 6: Security:
+# ---- Section 6: Security: ---- 
 
 ### What is UCP Client??
 - UCP Client (Universal Control Plane)
@@ -4879,8 +4879,306 @@ docker run ubuntu bash -c "ls /nonexistent"
 **CMDS:**
 ```
 docker ps
+docker container run -dt --name mybusybox busybox ping gooogle.com
+docker ps
+docker logs mybusybox
 
 ```
+
+- you will able to see the output of the commands that are running.
+
+- **CMDS:**
+```
+docker info
+```
+- Under `Log`, you have various log drivers such as `awslogs`, `fluentd`, `gcplogs`, `gelf`, `json-file` ,`none` , `syslog` , `local` ,` journald` , `splunk`.
+- These are the different type of logging drivers present in docker.
+
+- **CMDS:**
+```
+docker info | grep -i "logging driver"
+```
+- So anytime when you create a container and you do not specify a logging driver by default, 
+- Docker will associate the `json-file` logging driver with your container so we can even find it out.
+
+- **CMDS:**
+```
+docker ps
+docker inspect mybusybox
+
+```
+- Here you will find `LogConfig: { "Type": "json-file" ...}`
+- All of your log paths of the container are stored in a specific folder. Refer `LogPath`.
+- This will give you the default path in which all the logs will be stored.
+
+- **CMDS: to see all the logs present inside the log path**
+```
+less <copy the log path>`
+docker ps
+```
+
+- **CMDS:**
+```
+docker container run -dt --name mycustom --log-driver none busybox ping google.com
+docker ps
+docker logs mycutom
+
+```
+
+- The docker logs command is not available for drivers other than `json-file` and `journald`.
+
+### Creating volumes in Kubernetes
+- On-disk files in a Container are ephmeral. 
+- Ephemeral here means that if the container goes down, the data becomes inaccessible or if the container gets terminated the data gets lost.
+- When there are multiple containers who wants to share same data, it becomes a challenge.
+- One of the benefit is that it supports multiple types of volumes
+
+
+- **CMDS:**
+```
+eksctl create cluster --name lrm-eks-clstr --region us-east-1 --node-type t2.medium  --zones us-east-1a,us-east-1b
+eksctl delete cluster --name lrm-eks-clstr --region us-east-1
+```
+
+- **CODE: pod-volume.yml **
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demopod-volume
+spec:
+  containers:
+  - name: test-container
+    image: nginx
+    volumeMounts:
+    - name: first-volume
+      mountPath: /data
+  volumes:
+  - name: first-volume
+    hostPath:
+      path: /mydata
+      type: Directory
+```
+
+- since we know that host path basically mounts a specific file or directory within the host inside a container.
+- So we specify via path and the `path` is `/mydata`. And we also tell a type the `type` is `Directory`.
+- So this path that we want to mount inside the container is of a directory type.
+- This is the path which is present within the host where pods would be running.
+
+- `volumeMounts` does is that it says that you take this specific volume, which is first volume.
+- So you see within the volume you have `first-volume`.
+- So this `volumeMounts` is associated with the `first-volume` and then you specify the mount path.
+- So where exactly this directory from, the host should be mounted inside the container.
+
+-**CMDS:**
+```
+mkdir /mydata
+kubectl apply -f pod-volume.yml
+kubectl get pods
+kubectl exec -it demopod-volume bash
+cd /data
+touch kplabs.txt
+echo "Hi" > kplabs.txt
+ls
+df -h
+exit
+
+```
+
+- This directory `/data` is mounted from the host inside the container.
+- when you execute `df -h` , you will see a `Mounted on` -> you will see a `/data` partition.
+- So whatever files that you store inside `/data`, those files will underlyingly be stored in the `/mydata` of the host.
+
+-**CMDS:**
+```
+cd /mydata
+ls -ltr
+cat kplabs.txt
+
+```
+
+### Persistent volume and Persistent volume claim:
+- A **persistentVolume(PV)** is a piece of storage in the cluster that has been provisioned by an administrator or dynamically provisioned using Storage Classes.
+- Every volume which is created can be of different type.
+- This can be taken care by the **storage Administrator/Ops Team**.
+
+- A **PersistentVolumeClaim** is a request for the storage by a user.
+- Within the clain, user need to specify the size of the volumen along with access mode.
+- **Developer:** I want a volume of size 10 GB which is has speed of Fast for my pod.
+
+- Storage Administrator takes care of creating PV.
+- Developer can raise a `Claim` (I want a specific type of PV).
+- Reference that claim within the PodSpec file.
+
+**CMDS:**
+```
+vi pv.yml
+```
+
+**CODE: pv.yml -> PersistentVolume -> Storage Administrator**
+```
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: block-pv
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/data
+
+```
+
+- **CMDS:**
+```
+mkdir /tmp/data
+kubectl apply -f pv.yaml
+```
+- You will see the output as `persistentvolume....`
+
+- **CMDS:**
+```
+kubectl get pv
+```
+
+- **CODE: pvc.yml -> PersistentVolumeClaim.yml -> Developer**
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc
+spec:
+  storageClassName: manual  
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+- **CMDS:**
+```
+kubectl apply -f pvc.yml
+kubectl get pvc
+kubectl get pv
+```
+
+- **CODE: pod-pvc.yml**
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kplabs-pvc
+spec:
+  containers:
+    - name: my-frontend
+      image: nginx
+      volumeMounts:
+        - mountPath: "/data"
+          name: my-volume
+  volumes:
+    - name: my-volume
+      persistentVolumeClaim:
+        claimName: pvc	
+```
+
+- The developer will reference the claim `pvc`
+
+- **CMDS:**
+```
+kubectl apply -f pod-pvc.yml
+kubectl get pods
+kubectl exec -it kplabs-pvc
+cd /data
+ls -ltr
+touch kplabs.txt
+exit
+
+```
+
+### Volume expansion in K8s:
+- It can happen that your persistent volume has become full and you need to expand the storage for additional capacity.
+
+- Lets say you have a PV and the current capacity of your PV is 10 GB and it is completely full.
+- So at the later stage you might need to provision an additional capacity on top of this.
+- So this is what is referred as the `volume expansion`.
+
+- **1. Enabling Volume Expansion in the Storage Class.**
+- **Step 1:**
+- If you want to go ahead and expand the volume, the first step is to enable the volume expansion.
+- Now you have to make sure that a parameter of allow volume expansion is set to true Associate it with
+- the storage class where your PV is associated with.
+
+- **Step 2:**
+- Now once you have this parameter configured, the second step is to go ahead and perform the resizing
+- of your PVC, which is the persistent volume claim.
+- So within the PVC you go ahead and resize it.
+
+- **Step 3:**
+- Once PVC object is modified, you will have to restart the POD.
+- kubectl delete pod [POD-NAME]
+- kubectl apply -f pod-manifest.yml
+
+- **CODE: pod-pv.yml**
+```
+kind: Pod
+apiVersion: v1
+metadata:
+  name: storage-pod
+spec:
+  containers:
+    - name: my-frontend
+      image: busybox
+      command:
+        - sleep
+        - "36000"
+      volumeMounts:
+      - mountPath: "/data"
+        name: my-do-volume
+  volumes:
+    - name: my-do-volume
+      persistentVolumeClaim:
+        claimName: kplabs-pvc
+```
+- **CODE: pvc.yml**
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kplabs-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: do-block-storage
+```
+- ** External Commands Used:**
+```
+kubectl edit pvc kplabs-pvc
+kubectl exec storage-pod -- sh
+df -h
+```
+
+- **CMDS:**
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
