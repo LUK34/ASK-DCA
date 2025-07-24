@@ -5166,33 +5166,276 @@ df -h
 
 - **CMDS:**
 ```
+kubectl get storageclass do-block-storage -o yaml
+```
+
+- On executing the above command we need to check if the `allowVolumeExpansion:true`
+- because we are expanding volumen this step has to be true.
 
 
+- Under pvc.yml -> name -> kplabs-pv -> we have a storage of 5Gi
+
+- Under pv.yml -> we have the pod on the image of `busybox`. Here we are making use of `persistentVolumeClaim` ->`kplabs-pvc`
+- and we are mounting it on mountPath ->`/data`
+
+- **CMDS:**
+```
+ls -ltr
+kubectl apply -f pvc.yml
+kubectl get pvc
+kubectl get pv
+kubectl apply -f pod-pv.yml
+kubectl get pods
+kubectl describe pod storage-pod
+kubectl exec -it storage-pod -- sh
+df -h
+kubectl get pvc
+kubectl get pv
+```
+
+- Inorder to expand the volume we have to do the following
+
+- **CMDS:**
+```
+kubectl edit pvc kplabs-pvc
+```
+
+- you need to go down and edit the storage from `5Gi` to `10Gi`.
+
+- **CMDS:**
+```
+:wq
+kubectl get pvc kplabs-pvc -o yaml
+```
+
+- Here you will see a message -> `Waiting for user to (re-)start a pod to finish file system resize of volume on node.`
+- type -> `FileSystemResizePending`
+
+```
+kubectl get pv
+kubectl exec -it storage-pod -- sh
+df -h
+
+kubectl delete -f pod-pv.yml
+kubectl apply -f pod-pv.yml
+kubectl get pods
+kubectl exec -it storage-pod -- sh
+df -h
+```
+- This time you will see the capacity has been increased.
 
 
+### Reclaim Policy:
+- The reclaim policy is responsible for what happens to the data in persistent volume when 
+- the kubernetes persistent volumen claim has been deleted.
+
+- 3 types of reclaim Policy that we need to be aware of.
+- **Retain**:
+- When the PersistentVolumeClaim is deleted, the PersistentVolume still exists and the volume is considered "released"
+ 
+- **Delete**:
+- The persistent volumen is deleted when the claim is deleted.
+
+- **Recycle**:
+- If supported by the underlying volume plugin, the recyle reclaim policy performs a basic scrub (rm -rf /thevolume/*)
+- on the volume and makes it available again for a new claim.
 
 
+- The below example is delete Retain Policy.
+- **CODE: pvc-pv.yml**
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kplabs-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: "pvc-31a92a51-e693-41b4-ad9c-6c53329f98f2"
+  storageClassName: do-block-storage
+```
+
+- **CMDS:**
+```
+kubectl apply -f pvc-pv.yml
+kubectl get pvc
+kubectl get pv
+
+```
+- Now, if you look into the volume, the size is five, and there is also an associated reclaim policy.
+- And the reclaim policy that is associated with it is delete.
+- So that basically means that if you go ahead and delete this PVC, the associated PVC will also be removed.
+
+- **CMDS:**
+```
+kubectl delete pvc kplabs-pvc
+kubectl get pv
+```
+
+### Understanding Retain Reclaim Policy:
+- When PVC is deleted, the PersistentVolume still exists and the volume is considered `released`
+- It is not yet available for another claim because the previous claimant's data remains on the volume.
+
+- ** Steps for Reclaimation**
+- An administrator can manually reclaim the volume with the following steps.
+
+- Delete the PersistentVolume, The associated storage asset in external infrastructure (such as an AWS EBS, GCE PD, Azure Disk or cinder volume)
+- still exists after the PV is deleted.
+
+- Manually clean up the data on the associated storage asset accordingly.
+
+- Manually delete the associated storage asset, or if you want to reuse the same storage asset,
+- create a new PersistentVolume with the storage asset definition.
+
+- **CODE: pvc-pv.yml**
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kplabs-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: ""
+  storageClassName: do-block-storage
+```
+
+- **CMDS:**
+```
+kubectl apply -f pvc-pv.yml
+kubectl get pvc
+kubectl get pv
+kubectl edit pv <name of the pv>
+```
+
+- Here you will see a `persistentVolumeReclaimPolicy` as `Delete`.
+- Modify from `Delete` to `Retain`
+
+- **CMDS:**
+```
+kubectl get pv
+kubectl delete -f pvc.yml
+kubectl get pv
+```
+- When you execute the `kubectl get pv`.
+- Here the reclaim policy is `Retain` and the status is `Released`
+
+- **CODE: pvc-pv.yml**
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kplabs-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: "<paste the name of the pv here>"
+  storageClassName: do-block-storage
+```
+- **CMDS:**
+```
+kubectl apply -f pvc-pv.yml
+kubectl get pvc
+kubectl get pvc
+kubectl get pv
+```
+- Now, if you quickly do a cube, Ctl get PVC, you will see that the status is pending and the capacity is zero.
+- So even after some amount of time you will refresh, you will see that it is always on the pending state,
+- primarily because the PV that is being associated is still in the release state and there is a claim
+- that is associated with this PV.
+
+- **CMDS:**
+```
+kubectl edit pv <Name of the pv>
+```
+
+- You will have a section called claimRef and this claim reference was associated with the previous PVC that we had created and also deleted.
+- Remove the `claimRef` completely and save it.
+
+- **CMDS:**
+```
+wq!
+kubectl get pvc
+```
+
+- You will see the status as `Bound`
+
+- **CMDS:**
+```
+kubectl delete -f pvc-pv.yml
+```
+
+- So we already know that if we delete the PVC, the status of the associated PVC would be released.
+
+- **CMDS:**
+```
+kubectl delet pv <name of the pv>
+
+```
+
+### Mastering K8s stroage classes.
+- A storageClass provides a way for administrator to describe the "classes" of storage they offer.
+
+- Different classes might map to quality of service levels, or to backup policies, or to 
+- arbitrary policies determined by the cluster administrators.
+
+- **CODE:**
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ name: managed-disk
+spec:
+ accessModes:
+ - ReadWriteOnce
+ storageClassName: managed-premium
+ resources:
+   requests:
+     storage: 5Gi
+```
+
+- So if you look into this sample diagram, there are multiple classes of storage over here.
+- One is standard storage. You can have premium storage and so on.
+- So depending upon this, a persistent volume might fetch the storage from a premium storage or it might fetch it from the standard storage as well.
+- So the type of disk that is needed can be defined within the storage class.
+- Now if you look into the sample code associated with a persistent volume claim here, you can define a storage class name.
+
+- ** Storage Class Resource **
+- Each StorageClass contains the fields **provisioner** , **parameters** and **reclaimPolicy** which are 
+- used when PersistentVolume belonging to the class needs to be dynamically provisioned.
+
+- **Understanding Provisioner**
+- Each StorageClass has a provisioner that determines what volume plugin is used for provisioning PVs. The field must be specified.
+- `AWSElasticBlockStore`, `AzureFile`, `Local`, `StorageOS`, `Glusterfs`
+
+- ** CMDS: **
+```
+kubectl get storageclass
+
+```
+
+- So what happens here is that within the PVC, if you do not specify a storage class, `do-block-storage (default)` this one will be used.
 
 
+- ** CMDS: **
+```
+kubectl get storageclass -o yaml
+```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- So in case you have multiple storage class, let's assume you have one storage class for premium, one
+- storage class for standard, and for the PVC, you want to request the premium storage class.
+- So within the storage class name, you can specify the name of the storage class or tomorrow for a different
+- application, you need a standard disk so you can change the storage class name here from managed premium
+- to maybe manage standard.
 
 
 
