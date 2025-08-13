@@ -344,7 +344,101 @@ CMD["bash"]
 - **5.3 Docker Secrets**
 - To create a new secret, docker secret create command can be used.
 - This is a cluster management command, and must be execute on a swarm manager node.
-- Remember that you annot update or rename secret.
+- Remember that you Cannot update or rename secret.
+```
+--secret-add and --secret-rm flags for docker service update
+```
+
+- **5.4 Secrets Mount Path**
+- When you grant a newly created or running service access to a secret,
+- the decrypted secret mounted into the container in following path:
+```
+/run/secrets/<secret_name>
+```
+- We can also specify a custom location for the secret.
+```
+docker service create --name redis --secret source=mysecret,target=/root/secretdata
+```
+
+- **5.5 Swarm Auto-Lock**
+- Know about the how you can lock the swarm cluster.
+- If your swarm is compromised and if the data is stored in plain-text,
+- an attack can get all the sensitive information.
+- Docker Lock allows us to have control over the keys.
+```
+docker swarm update --autolock=true
+```
+
+- **5.6 Mutual TLS Authentication**
+- When you create a swarm by running docker swarm init,
+- Docker designates itself as a manager node.
+- By default, the manager node generates a new root Certificate Authority (CA)
+- along with a key pair, which are used to secure communications.
+
+- **5.7 Certficate for each Node**
+- Each time a new node joins the swarm, the manager issues a certificate to the node.
+- By default, each node in the swarm renews its certificate every 3 months.
+
+- **5.8  Priveleged container**
+- By default, Docker containers are "unprivileged"
+- When the operator executes docker run --privilged, Docker will enable access to all 
+- devices on the host to allow the container nearly all the same access to the host as processes
+- running outside containers on the host.
+
+- **5.9 Go through roles in UCP. Understand it**
+- In Docker Universal Control Plane (UCP), roles are used to define access control by specifying what actions
+- a user or team can perform on Docker resources. UCP implements Role-Based Access Control (RBAC) to manage permissions at various scopes like cluster, namespaces (collections), nodes, and services.
+- **Full Control:**	Complete access to view, modify, and delete the resource.
+- **View Only:** Can view the resource but cannot modify or delete it.
+- **Restricted Control:(Important):** Limited set of actions (depends on resource type).
+- **Scheduler:** Can schedule workloads (containers/services) on nodes.
+- **Read-Only:** Read-only access to the UCP UI and CLI.
+- **No Access:** Cannot view or interact with the resource.
+
+
+### Section 6: Storage and VOLUMES
+- **6.1 Mounting volumes inside container**
+```
+docker container run -dt --name webserver -v myvolume:/etc busybox sh
+docker container run -dt --name webserver --mount source=myvolume, target=/etc busybox sh
+```
+- You can even mount same volume to multiple containers.
+- Also know what bind mounts are all about.
+- How you can map a directory from host to container.
+
+- **6.2 Remove volume when container exits**
+- If you have not named the volume, then when you specify --rm option, the volumes 
+- associated will also be deleted when the container is deleted.
+
+- **6.3 Device Mapper**
+- loop-lvm mode is for tesing purpose onu.
+- direct-lvm mode can be used in production.
+
+
+### Section 7; Kubernetes
+- A pod in Kubernetes represents a group of one or more application containers,
+- and some shared resource for those containers.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
